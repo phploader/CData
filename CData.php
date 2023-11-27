@@ -47,6 +47,7 @@
 
 ===============================
 ##Changelog:
+#2.01
 
 #2.00
 + Möglichkeit, gleiche Knotennamen in unterschiedlichen Pfaden zu verwenden.
@@ -249,15 +250,17 @@ class CData
 			CREATE TABLE IF NOT EXISTS "wp_data_cache" (
 			"id" text NOT NULL,
 			"type_id" text NOT NULL,
+			"parent_path_hash" integer NOT NULL,
 			"path_hash" integer NOT NULL,
 			"data" blob NULL,
 			"utimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
 			"itimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
-			PRIMARY KEY ("id", "type_id", "path_hash")
+			PRIMARY KEY ("id", "type_id", "parent_path_hash")
 			);
 			CREATE INDEX IF NOT EXISTS "wp_data_tmp_id" ON "wp_data_cache" ("id");
 			CREATE INDEX IF NOT EXISTS "wp_data_tmp_type_id" ON "wp_data_cache" ("type_id");
 			CREATE INDEX IF NOT EXISTS "wp_data_tmp_utimestamp" ON "wp_data_cache" ("utimestamp");
+			CREATE INDEX IF NOT EXISTS "wp_data_tmp_parent_path_hash" ON "wp_data_cache" ("parent_path_hash");
 			CREATE INDEX IF NOT EXISTS "wp_data_tmp_path_hash" ON "wp_data_cache" ("path_hash");
 
 			CREATE TABLE IF NOT EXISTS "wp_data_child" (
@@ -317,8 +320,10 @@ class CData
 			if ($this->PATTERN[$kType]??false) { #Pattern: Überprüft ob erlaubtes Type übergeben wurde
 				
 				foreach ((array) $Type['D'] as $kSup => $Sup) {
-					
-					
+				
+					##echo "Kind Hash: {$kType}-{$kSup}-".($Sup['PATH_HASH2']??'')."<br>";
+					##$D['PATH_HASH'] = ($Sup['PATH_HASH2']??'');
+
 					#echo "{$kType}-{$kSup} = {$D['PATH_HASH2'][$kType][$kSup]} |";
 					$this->refreshCacheObjeckt[ $D['PATH_HASH'].$kType ][ $kSup ] = $kSup; #ToDo: Wegen Slot Methode, wird mehrfach einem Type-Sup zugeordnet. #ToDo: Zusätzlich path_hash muss beachtet werden!
 					if (($Sup['Active']??false) != -2) {
@@ -326,16 +331,22 @@ class CData
 						#$_IU_DATA_ATT = null;
 						$_IU_DATA_ATT_SLOT = null;
 						foreach ((array) $Sup as $kATT => $ATT) {
-						##	echo "Kind: {$kSup}-{$kATT}-{$ATT} | <br>";							
-#echo $D['PATH_HASH2'][$ATT][$kATT];
-	#$D['PATH_HASH'] = hash("crc32b", $D['PATH_HASH'][$ATT][$kATT]);
-	##$D['PATH_HASH'] = $Sup['PATH_HASH2'];
+								
+
 							if($this->PATTERN[$kType][$kATT]??false) { #Pattern: Überprüfen ob erlaubtes Attribut des Types übergeben wurde
 								
 									if ($this->PATTERN[$kType][$kATT]['Type'] == 'id' && $ATT != '') { #IDs werden in wp_data Eingetragen!
 										$InsertID = false;
 										$IU_DATA??='';
+
 										$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$D['PATH_HASH']}','{$ATT}','{$kATT}')";
+										/*
+										$ATT = (!is_array($ATT))?[$ATT]:$ATT;
+										foreach($ATT AS $_kATT => $_ATT) {
+											$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$D['PATH_HASH']}','{$_ATT}','{$kATT}')";
+										}
+										*/
+					
 									}
 									elseif ($this->PATTERN[$kType][$kATT]['Type'] == 'id' ) {#lösche ID
 										$D_DATA??='';
@@ -399,7 +410,7 @@ class CData
 		
 		#echo 'I.'.(microtime(true)-$s).'s<br>';
 		if ($IU_DATA??false) {
-		
+		#echo $IU_DATA .'<br><br>';
 			$this->SQL->exec("INSERT INTO wp_data (id, type_id, path_hash, parent_data_id,parent_type_id) VALUES {$IU_DATA} 
 						ON CONFLICT(id, type_id, path_hash) DO UPDATE SET
 							parent_data_id =			CASE WHEN excluded.parent_data_id IS NOT NULL	AND ifnull(parent_data_id,'') <> excluded.parent_data_id		THEN excluded.parent_data_id ELSE parent_data_id END,
@@ -559,21 +570,28 @@ class CData
 						if ($Sup['Active']??false != -2) {
 							#Wenn das Objekt weitere Knoten beinhaltet, dann reqursive diese ebenfalls anlegen.
 							foreach ((array) $Sup as $kATT => $ATT) {
-								if (is_array($ATT) && $ATT['D']) { 
-#			echo "Parent: {$kType}-{$kSup} | ";					
-#$d['PATH_HASH2'][$kSup][$kATT] = hash("crc32b", $D['PATH_HASH'].$kType.$kSup);#Hash ID Pro Pfad
+								if (is_array($ATT) && isset($ATT['D'])) { 
+
+			##echo "Parent: {$kType}-{$kSup} | <br>";					
 
 
 									foreach ((array) $ATT['D'] as $kSubATT => $SubATT) { #setze für jedes Attribute Parent ID
-										$d[$kATT]['D'][$kSubATT] = &$ATT['D'][$kSubATT];
-										$d[$kATT]['D'][$kSubATT][$kType] = $kSup;
-
-										#echo "{$kATT}.{$kSubATT}-{$kType} = {$d[$kATT]['D'][$kSubATT]['LANGUAGE']} : <br>";
-										##$d[$kATT]['D'][$kSubATT]['PATH_HASH2'] = hash("crc32b", $D['PATH_HASH'].$kType.$kSup);
 										
+										$d[$kATT]['D'][$kSubATT] = &$ATT['D'][$kSubATT]; #ToDo: wird überschrieben und die untere Zeile wird nur die letzte ID zugewiesen!!
+										##$d[$kATT]['D'][$kSubATT] = array_replace_recursive(($d[$kATT]['D'][$kSubATT]??[]),($ATT['D'][$kSubATT]??[]));
+										$d[$kATT]['D'][$kSubATT][$kType] = $kSup; #Es können unterschiedliche IDs sein!
+										###echo "{$kATT}-{$kSubATT}-{$kType} = ".implode(',',(array)$d[$kATT]['D'][$kSubATT][$kType])."<br>";
+										
+										#Path_hash2 wird mit (Parent_Type+Parent_id)+(Child_type+Child_id) generiert.
+										##echo "{$kATT}-{$kSubATT} = ".($D[$kType]['D'][$kSup]['PATH_HASH2']??'')."-{$kType}-{$kSup} <br>";
+										##$_hPATH = hash("crc32b", ($D[$kType]['D'][$kSup]['PATH_HASH2']??'').$kType.$kSup);
+										##$d[$_hPATH][$kATT]['D'][$kSubATT] = &$ATT['D'][$kSubATT];
+										##$d[$_hPATH][$kATT]['D'][$kSubATT]['PATH_HASH2'] = $_hPATH;
+										
+
 										#echo $kATT.'>'.$kType.' : ';
-										$this->PATTERN[$kATT][$kType] = ['Type' => 'id']; #Füge temporär Parent mit Id, damit in der höheren Ebene die ID zum Parent gespeichert werden kann.
 									}
+									$this->PATTERN[$kATT][$kType] = ['Type' => 'id']; #Füge temporär Parent mit Id, damit in der höheren Ebene die ID zum Parent gespeichert werden kann.
 								}
 							}
 
@@ -758,6 +776,8 @@ class CData
 		foreach ((array) $F as $kType => $Type) {
 			if ($this->PATTERN[$kType]??null) {
 				
+				##echo "GET Kind: ".implode(',',(array)$Type['WW']['PATH_HASH2'])."<br>";
+
 				$W = $L = $O = NULL;
 				$F[$kType]['W']??=null;
 				foreach ((array) $F[$kType]['W'] as $kR => $R) {
@@ -769,6 +789,7 @@ class CData
 
 						$_kWW = explode('|',$kWW);#Splittet Attribut|Anweisung
 						
+
 						if (($_kWW[0]??false) == 'ID' ) {
 							$W_ID .= (($W_ID) ? ' AND ' : '') . " dtmp.id IN ('{$WW}') AND dtmp.type_id = '{$kType}' AND path_hash = '{$F['PATH_HASH']}' "; # AND (dtmp.path = '{$this->path}' OR dtmp.path = '')
 
@@ -945,6 +966,9 @@ class CData
 
 				foreach ((array) $this->PATTERN as $kPAT => $PAT) { #Durchlaufe alle Pattern
 					#echo  "{$kPAT} > ";
+
+					##$_PARENT_PATH_HASH2 = $F[$kType]['WW']['PATH_HASH2'];
+
 					if (isset($Type[$kPAT])) { #ist allgemeine Bedinung vorhande PLATFORM.WAREHOUSE
 						$f = $d = null; #$d muss je Durchgang resetet werden!
 						
@@ -955,14 +979,24 @@ class CData
 						#Setze Filter nach Vater ID
 						if($D[$kType]['D']??null) {
 							foreach ((array) $D[$kType]['D'] as $kDat => $Dat) {
-								$f[$kPAT]['W'][0][$kType][] = $kDat;#Übergebe ID vom Vater
-								$this->PATTERN[$kPAT][$kType] = ['Type' => 'id']; #Füge temporär Parent mit Id, damit in der höheren Ebene die ID zum Parent gespeichert werden kann.
+								$f[$kPAT]['W'][0][$kType][] = $kDat;#Übergebe ID vom Vater #ToDo: Wenn OR gebaut wird, kann die Parent id nicht zur 100% wirken, muss außerhalb der WHERE And-OR Bedinung übergeben werden
+
+								#ToDo: Alle PATH_HASH2 übergeben
+								##$f[$kPAT]['WW']['PATH_HASH2'][] = hash("crc32b", $_PARENT_PATH_HASH2.$kType.$kDat);
+								##echo "GET: [{$kPAT}]-> ".implode(',',(array)$_PARENT_PATH_HASH2)."-{$kType}-{$kDat} = ".hash("crc32b", $_PARENT_PATH_HASH2.$kType.$kDat)." <br>";
+								
 							}
+							$this->PATTERN[$kPAT][$kType] = ['Type' => 'id']; #Füge temporär Parent mit Id, damit in der höheren Ebene die ID zum Parent gespeichert werden kann.
+							#$this->PATTERN[$kPAT]['PATH_HASH2'] = ['Type' => 'id'];
+							
+						
 						}
 						#echo '-A----------------<br>';
 						#print_r($d[$kPAT]['W']);
 						#echo '-E---------------<br>';
 						$f['PATH_HASH'] = hash("crc32b", ($F['PATH_HASH']??'').$kType);#Übergabe path_hash
+
+						
 						$stLevel++;
 						$this->get_object_reqursive($d,$f);
 						$stLevel--;
@@ -983,4 +1017,238 @@ class CData
 
 		
 	}
+
+
+
+	function set_object_reqursive2(&$D = null, $Parent_Hash='', $Parent_Type = '', $Parent_Id = '' ) {
+		static $stLevel = 0;
+		
+		static $IU_DATA = '';
+		static $D_DATA = '';
+		static $IU_DATA_ATT  = '';
+		static $D_DATA_ATT  = '';
+		static $_RefrechCache = [];
+		
+		$savePatern = $this->PATTERN;
+		foreach ((array) $D AS $kType => $Type) { ##[PlATFORM]
+			
+			if ($this->PATTERN[$kType]??false) { #Prüfe in Pattern ob diese erlaubt sind
+				
+				foreach ((array) $Type['D'] AS $kSup => $Sup) { #PlATFORM.D[x]
+				
+					$_Parent_Hash = hash("crc32b", $Parent_Hash.$kType.$kSup);
+					$_RefrechCache[$Parent_Hash] = true; #aktuallisiere anhand des path_hash
+					
+					if(($Sup['Active']??false) != -2 ) { #Insert/ Update
+
+						$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$Parent_Type}','{$Parent_Id}')";
+						
+						
+						
+						
+						foreach ((array) $Sup as $kATT => $ATT) { #PlATFORM.D.x.[ATTRIBUTE]
+							
+								if (is_array($ATT) && isset($ATT['D'])) { #ist ein ATT eine weitere Ebene? PlATFORM.D.x.ATTRIBUTE.D.[x]
+									$d[$kATT]['D'] = &$ATT['D'];
+									##$d[$kATT]['D'][$kSubATT][$kType] = $kSup; 
+									
+									
+									$stLevel++;
+									$this->PATTERN = $savePatern[$kType]['D']??=[];
+									$this->set_object_reqursive2($d,$_Parent_Hash,$kType,$kSup);
+									$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
+									$stLevel--;
+								}
+								elseif($this->PATTERN[$kType][$kATT]??false) {
+									if($ATT != '') {
+										$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$kATT}'";#Setze Attribute
+										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->_Value2SortHash($ATT)."'" : ",NULL";
+										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->SQL->escapeString($ATT)."'" : ",NULL";
+										$IU_DATA_ATT .= ")";
+									}
+									else {
+										$D_DATA_ATT .= (($D_DATA_ATT) ? ' OR ' : '') ." (id = '{$kSup}' AND type_id = '{$kType}' AND attribute_id = '{$kATT}' AND path_hash = '{$Parent_Hash}' )";
+									}
+									
+								}
+							
+						}
+						
+						
+					}
+					else { #Delete
+						$D_DATA .= (($D_DATA) ? ' OR ' : '') . " (id = '{$kSup}' AND type_id = '{$kType}' AND parent_type_id = '{$Parent_Type}' AND parent_data_id = '{$Parent_Id}')"; 
+					}
+				}
+			}
+			
+			
+		}
+		
+		if($stLevel == 0) {
+			#1. Speichere in der DB
+			#echo $IU_DATA;echo "<br>";
+			#echo $IU_DATA_ATT;
+			if ($IU_DATA??false) {
+				$this->SQL->exec("INSERT INTO wp_data (id, type_id, path_hash, parent_type_id, parent_data_id) VALUES {$IU_DATA} 
+							ON CONFLICT(id, type_id, path_hash) DO UPDATE SET
+								parent_data_id =			CASE WHEN excluded.parent_data_id IS NOT NULL	AND ifnull(parent_data_id,'') <> excluded.parent_data_id		THEN excluded.parent_data_id ELSE parent_data_id END,
+								parent_type_id =			CASE WHEN excluded.parent_type_id IS NOT NULL	AND ifnull(parent_type_id,'') <> excluded.parent_type_id		THEN excluded.parent_type_id ELSE parent_type_id END,
+								utimestamp =	CASE WHEN 
+													excluded.parent_type_id IS NOT NULL	AND ifnull(parent_type_id,'') <> excluded.parent_type_id
+												THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
+							");
+			}
+			if ($IU_DATA_ATT??false) {
+				$this->SQL->query("INSERT INTO wp_data_att (id, type_id,path_hash, attribute_id, sort, value ) VALUES {$IU_DATA_ATT} 
+							ON CONFLICT(id,  type_id, path_hash, attribute_id) DO UPDATE SET
+								value =			CASE WHEN excluded.value IS NOT NULL	AND ifnull(value,'') <> excluded.value		THEN excluded.value ELSE value END,
+								sort =			CASE WHEN excluded.sort IS NOT NULL	AND ifnull(sort,'') <> excluded.sort		THEN excluded.sort ELSE sort END,
+								utimestamp =	CASE WHEN 
+													excluded.value IS NOT NULL	AND ifnull(value,'') <> excluded.value
+												THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
+							");
+			}
+			#2. Lösche in der DB
+			if ($D_DATA??false) {
+				$this->SQL->query("DELETE FROM wp_data WHERE {$D_DATA}");
+			}
+			if ($D_DATA_ATT??false) { #Lösche leeres Attribut
+				$this->SQL->query("DELETE FROM wp_data_att WHERE {$D_DATA_ATT}");
+			}
+			#Lösche weitere unter Ebenen. 'ToDo: Je mehr Ebenen, desto heufiger muss diese ausgeführt werden um entgültig zu bereinigen! D.h. es kann erst beim nächsten Delete restlichen Daten von anderen Delete beseitigen.
+			$this->SQL->query("DELETE FROM wp_data AS dt2 WHERE 
+								NOT EXISTS (SELECT 1 FROM wp_data WHERE dt2.parent_data_id = id AND  dt2.parent_type_id  = type_id)
+								AND parent_data_id <> ''"); #Lösche RefIds
+			#Lösche verwaiste Kinder Zweige aus wp_data_att ToDo: Performance Problem
+			$this->SQL->query("DELETE FROM wp_data_att AS dta2 WHERE 
+								NOT EXISTS (SELECT 1 FROM wp_data WHERE dta2.id = id AND dta2.type_id = type_id )
+			");
+			
+			#3. invalidiere Cache
+			$this->_set_cache2($_RefrechCache);
+		}
+	}
+	
+	private function _set_cache2(&$RefrechCache_PathHash=null) {
+		
+		if($RefrechCache_PathHash) {
+			
+			#1. Lösche alte Datensätze anhand des PathHash
+			$Keys = implode("','",array_keys($RefrechCache_PathHash));
+			$this->SQL->query("DELETE FROM wp_data_cache WHERE parent_path_hash IN ('{$Keys}')");
+			$this->SQL->query("DELETE FROM wp_data_child WHERE child_path_hash IN ('{$Keys}')");
+			
+			#2. Selektiere Datensätze anhand des PathHash
+			/*
+			$qry = $this->SQL->query("SELECT id, type_id, path_hash, attribute_id, value
+										FROM wp_data_att dat
+										WHERE path_hash IN ('{$Keys}')
+			");*/
+			$qry = $this->SQL->query("SELECT d.id, d.type_id, d.path_hash, attribute_id, value
+						FROM wp_data d LEFT JOIN wp_data_att dat ON d.id = dat.id AND d.type_id = dat.type_id AND d.path_hash = dat.path_hash
+						WHERE d.path_hash IN ('{$Keys}')
+			");
+			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+				$set_d[$a['path_hash']][$a['type_id']]['D'][$a['id']][$a['attribute_id']] = $a['value'];
+			}
+			
+			#3. Speichere neue Datensätze im Cache ab
+			$IU_DATA_ATT = '';
+			foreach ((array) $set_d as $kPath => $Path) {
+				foreach ((array) $Path as $kType => $Type) {
+					foreach ((array) $Type['D'] as $kSup => $Sup) {
+						
+						$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$kPath}'";
+						
+						$json = $this->SQL->escapeString(json_encode($Sup));
+						$ChildHash = hash("crc32b", $kPath.$kType.$kSup);
+						$IU_DATA_ATT .= ",'{$ChildHash}'";
+						$IU_DATA_ATT .= ",'" . str_replace([',"":""','"":"",','"":""','"":null'],'',$json) . "'"; #replace entfernt leere Key Werte
+						
+						$IU_DATA_ATT .= ")";
+					}
+				}
+			}
+			
+			if ($IU_DATA_ATT) {
+				$this->SQL->query("REPLACE INTO wp_data_cache (id, type_id, parent_path_hash,path_hash,data) VALUES {$IU_DATA_ATT} 
+									ON CONFLICT(id, type_id, parent_path_hash) DO UPDATE SET
+										data =			CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data		THEN excluded.data ELSE data END,
+										utimestamp =	CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data
+														THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
+									");
+									
+			}
+			#4. Aktuallisiere data_child Counts
+			$this->SQL->query("REPLACE INTO wp_data_child (id, type_id, child_path_hash, child_type_id, child_count) 
+									SELECT parent_data_id, parent_type_id, path_hash, type_id, count(*) FROM wp_data
+									WHERE path_hash IN ('{$Keys}')
+									GROUP BY parent_data_id,path_hash,type_id
+									");
+		}
+		
+	}
+
+
+	function get_object_reqursive2(&$D = null, &$F=null, $Parent_Hash=[], $Parent_Type = '', $Parent_Id = '') {
+		static $stLevel = 0;
+		
+		
+		
+		$D = ($stLevel==0)?['' => $D]:$D;
+		
+		##$savePatern = $this->PATTERN;
+		#1. Erstelle Bedinung
+		$W = $f = '';
+		
+			foreach((array)$F AS $kType => $Type) {
+
+					$kHash = ($Parent_Hash)?implode("','",(array)$Parent_Hash[$kType]):"";
+					$W .= ($W? ' OR ':'')." (dtmp.type_id = '{$kType}' AND dtmp.parent_path_hash IN ('{$kHash}') ) ";
+					$f = $F[ $kType ];
+
+			}
+	
+
+
+
+
+		
+		#2. Holle Daten
+		$_Hash = [];
+		if($W) {
+			$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data 
+												FROM  wp_data_cache dtmp 
+												WHERE 1
+												AND ({$W})" );
+			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+				$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
+				$d[ $a['path_hash'] ] = &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
+
+				#Kind
+				foreach((array)$F[ $a['type_id'] ] AS $kChild => $Child) {
+					$_Hash[ $kChild ][] = $a['path_hash'] ;
+				}
+
+			}
+		
+			#3. gehe in die weitere Ebene
+			$stLevel++;
+			##$this->PATTERN = $savePatern[$kType]['D']??=[];
+			$this->get_object_reqursive2($d,$f,$_Hash);
+			##$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
+			$stLevel--;
+			
+
+
+			if($stLevel == 0) {
+				$D = $D[ '' ];
+			}
+
+		}
+		
+					
+	}
+
 }
