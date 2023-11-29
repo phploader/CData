@@ -48,7 +48,8 @@
 ===============================
 ##Changelog:
 #2.01
-
+~ Überarbeitung und vereinfachung der get und set Funktionen - Code
+~ Performance Optimierung
 #2.00
 + Möglichkeit, gleiche Knotennamen in unterschiedlichen Pfaden zu verwenden.
 ! Fix: Count Ausgabe beim Parent Array behandelt.
@@ -73,7 +74,6 @@
 ! Fix: Problem beim Speichern von mehreren unterschiedlichen Knoten behoben.
 ! Fix: WHERE-Anweisung mit OR-Anweisung behoben.
 + Datenbankzugriff (SQLite) wurde in die Klasse integriert.
-
 #1.00
 + Geburt
 
@@ -283,333 +283,7 @@ class CData
 	function getPattern(&$D) {
 		$D['PATTERN'] = $this->PATTERN;
 	}
-	function CleanDB() {
-		/*ToDo:
-		1. Attribute und IDs löschen diese nicht mehr dem Patern entsprechen
-		2. Lösche verwaiste data oder data_att aus der Datenbank die keinen Vater haben
-		*/
-	}
 
-	/** ToDo: Wird nicht genutzt, ist momentan nur eine Idee
-	 * Erstellt ein Pattern Nummer zuweisung und gibt eine Nummer als ID aus.
-	 * search = Pattern oder Nummer
-	*//*
-	function _Pattern2Number($search) {
-		if(!$this->Pattern2Number[ $search ]) {
-			$this->SQL->query("INSERT INTO wp_data_pattern2number (pattern) VALUES ('{$search}') ");
-		}
-
-		if(!$this->Pattern2Number && !$this->Pattern2Number[ $search ]) {
-			$qry = $this->SQL->query("SELECT id, pattern FROM wp_data_pattern2number");
-			while ($a = $qry->fetchArray(SQLITE3_NUM)) {
-				$this->Pattern2Number[ $a[1] ] = $a[0];
-				$this->Pattern2Number[ $a[0] ] = $a[1];
-			}
-		}
-		return $this->Pattern2Number[ $search ];
-	}
-	*/
-	//Band
-	private function set_object(&$D)
-	{
-		$D['PATH_HASH']??='';
-		#$s = microtime(true);
-		#echo 'START'.(microtime(true)-$s).'s<br>';
-		foreach ((array) $D as $kType => $Type) {
-			
-			if ($this->PATTERN[$kType]??false) { #Pattern: Überprüft ob erlaubtes Type übergeben wurde
-				
-				foreach ((array) $Type['D'] as $kSup => $Sup) {
-				
-					##echo "Kind Hash: {$kType}-{$kSup}-".($Sup['PATH_HASH2']??'')."<br>";
-					##$D['PATH_HASH'] = ($Sup['PATH_HASH2']??'');
-
-					#echo "{$kType}-{$kSup} = {$D['PATH_HASH2'][$kType][$kSup]} |";
-					$this->refreshCacheObjeckt[ $D['PATH_HASH'].$kType ][ $kSup ] = $kSup; #ToDo: Wegen Slot Methode, wird mehrfach einem Type-Sup zugeordnet. #ToDo: Zusätzlich path_hash muss beachtet werden!
-					if (($Sup['Active']??false) != -2) {
-						$InsertID = true;
-						#$_IU_DATA_ATT = null;
-						$_IU_DATA_ATT_SLOT = null;
-						foreach ((array) $Sup as $kATT => $ATT) {
-								
-
-							if($this->PATTERN[$kType][$kATT]??false) { #Pattern: Überprüfen ob erlaubtes Attribut des Types übergeben wurde
-								
-									if ($this->PATTERN[$kType][$kATT]['Type'] == 'id' && $ATT != '') { #IDs werden in wp_data Eingetragen!
-										$InsertID = false;
-										$IU_DATA??='';
-
-										$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$D['PATH_HASH']}','{$ATT}','{$kATT}')";
-										/*
-										$ATT = (!is_array($ATT))?[$ATT]:$ATT;
-										foreach($ATT AS $_kATT => $_ATT) {
-											$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$D['PATH_HASH']}','{$_ATT}','{$kATT}')";
-										}
-										*/
-					
-									}
-									elseif ($this->PATTERN[$kType][$kATT]['Type'] == 'id' ) {#lösche ID
-										$D_DATA??='';
-										$D_DATA .= (($D_DATA) ? ' OR ' : '') . " (id = '{$kSup}' AND type_id = '{$kType}' AND parent_type_id = '{$kATT}')";
-									}
-									elseif ( isset($this->PATTERN[$kType][$kATT]['Row']) && isset($this->PATTERN[$kType][$kATT]['Slot']) ) { #Speichern in wp_data_att_slot
-										
-										if($this->PATTERN[$kType][$kATT]['Type'] == 'password') {
-											$ATT = password_hash($ATT,PASSWORD_DEFAULT);
-										}
-										
-										$_IU_DATA_ATT_SLOT[ $this->PATTERN[$kType][$kATT]['Row'] ][ $this->PATTERN[$kType][$kATT]['Slot'] ] .= ",'{$kATT}'";
-										$_IU_DATA_ATT_SLOT[ $this->PATTERN[$kType][$kATT]['Row'] ][ $this->PATTERN[$kType][$kATT]['Slot'] ] .= (isset($ATT)) ? ",'".$this->_Value2SortHash($ATT)."'" : ",''";
-										$_IU_DATA_ATT_SLOT[ $this->PATTERN[$kType][$kATT]['Row'] ][ $this->PATTERN[$kType][$kATT]['Slot'] ] .= (isset($ATT)) ? ",'".$this->SQL->escapeString($ATT)."'" : ",''";
-										
-									}
-									else { #Speichern in wp_data_att
-										if($ATT != '') {
-											if($this->PATTERN[$kType][$kATT]['Type'] == 'password') {
-												$ATT = password_hash($ATT,PASSWORD_DEFAULT);
-											}
-											$IU_DATA_ATT??='';
-											$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$D['PATH_HASH']}','{$kATT}'";
-											$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->_Value2SortHash($ATT)."'" : ",NULL";
-											$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->SQL->escapeString($ATT)."'" : ",NULL";
-											$IU_DATA_ATT .= ")";
-										}
-										else {
-											$D_DATA_ATT .= (($D_DATA_ATT) ? ' OR ' : '') ." (id = '{$kSup}' AND type_id = '{$kType}' AND attribute_id = '{$kATT}' )";
-										}
-									}
-							}
-						}
-						
-						
-						foreach((array)$_IU_DATA_ATT_SLOT AS $kR => $vR) {
-							$IU_DATA_ATT_SLOT .= ($IU_DATA_ATT_SLOT?',':'')." ('{$kSup}','{$kType}','{$D['PATH_HASH']}','{$kR}'";
-							for($i = 0; $i < 10; $i++) {
-								if($vR[$i])
-									$IU_DATA_ATT_SLOT .= $vR[$i].",cast(strftime('%s', 'now') as int), cast(strftime('%s', 'now') as int)";
-								else
-									$IU_DATA_ATT_SLOT .= ",NULL,NULL,NULL,NULL,NULL";
-							}
-							$IU_DATA_ATT_SLOT .= ")";
-						}
-						
-						
-
-						if ($InsertID) {
-							$IU_DATA??='';
-							$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$D['PATH_HASH']}','','')";
-						}
-
-					} else {
-						$D_ALLDELETE??='';
-						$D_ALLDELETE .= (($D_ALLDELETE) ? ' OR ' : '') . "(id = '{$kSup}' AND type_id = '{$kType}')";
-					}
-				}
-			}
-		}
-		
-		#echo 'I.'.(microtime(true)-$s).'s<br>';
-		if ($IU_DATA??false) {
-		#echo $IU_DATA .'<br><br>';
-			$this->SQL->exec("INSERT INTO wp_data (id, type_id, path_hash, parent_data_id,parent_type_id) VALUES {$IU_DATA} 
-						ON CONFLICT(id, type_id, path_hash) DO UPDATE SET
-							parent_data_id =			CASE WHEN excluded.parent_data_id IS NOT NULL	AND ifnull(parent_data_id,'') <> excluded.parent_data_id		THEN excluded.parent_data_id ELSE parent_data_id END,
-							parent_type_id =			CASE WHEN excluded.parent_type_id IS NOT NULL	AND ifnull(parent_type_id,'') <> excluded.parent_type_id		THEN excluded.parent_type_id ELSE parent_type_id END,
-							utimestamp =	CASE WHEN 
-												excluded.parent_type_id IS NOT NULL	AND ifnull(parent_type_id,'') <> excluded.parent_type_id
-											THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
-						"); #CURRENT_TIMESTAMP 1665989041
-			#itimestamp =	CASE WHEN excluded.itimestamp IS NULL THEN excluded.cast(strftime('%s', 'now') as int) ELSE itimestamp END
-		}
-		#echo 'II.'.(microtime(true)-$s).'s<br>';
-
-		if ($IU_DATA_ATT??false) {
-			$this->SQL->query("INSERT INTO wp_data_att (id, type_id,path_hash, attribute_id, sort, value ) VALUES {$IU_DATA_ATT} 
-						ON CONFLICT(id,  type_id, path_hash, attribute_id) DO UPDATE SET
-							value =			CASE WHEN excluded.value IS NOT NULL	AND ifnull(value,'') <> excluded.value		THEN excluded.value ELSE value END,
-							sort =			CASE WHEN excluded.sort IS NOT NULL	AND ifnull(sort,'') <> excluded.sort		THEN excluded.sort ELSE sort END,
-							utimestamp =	CASE WHEN 
-												excluded.value IS NOT NULL	AND ifnull(value,'') <> excluded.value
-											THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
-						"); #CURRENT_TIMESTAMP 1665989041
-			#itimestamp =	CASE WHEN excluded.itimestamp IS NULL THEN excluded.cast(strftime('%s', 'now') as int) ELSE itimestamp END
-		}
-		
-		if ($IU_DATA_ATT_SLOT??false) {
-			$this->SQL->exec("INSERT INTO wp_data_att_slot (id, type_id,path_hash, row_id,
-			attribute_id0, sort0, value0, utimestamp0, itimestamp0,
-			attribute_id1, sort1, value1, utimestamp1, itimestamp1,
-			attribute_id2, sort2, value2, utimestamp2, itimestamp2,
-			attribute_id3, sort3, value3, utimestamp3, itimestamp3,
-			attribute_id4, sort4, value4, utimestamp4, itimestamp4,
-			attribute_id5, sort5, value5, utimestamp5, itimestamp5,
-			attribute_id6, sort6, value6, utimestamp6, itimestamp6,
-			attribute_id7, sort7, value7, utimestamp7, itimestamp7,
-			attribute_id8, sort8, value8, utimestamp8, itimestamp8,
-			attribute_id9, sort9, value9, utimestamp9, itimestamp9
-			) VALUES {$IU_DATA_ATT_SLOT} 
-						ON CONFLICT(id,  type_id, path_hash, row_id) DO UPDATE SET
-							value0			=			CASE WHEN excluded.value0 IS NOT NULL			AND ifnull(value0,'') <> excluded.value0					THEN excluded.value0 ELSE value0 END,
-							sort0			=			CASE WHEN excluded.sort0 IS NOT NULL			AND ifnull(sort0,'') <> excluded.sort0					THEN excluded.sort0 ELSE sort0 END,
-							attribute_id0	=			CASE WHEN excluded.attribute_id0 IS NOT NULL	AND ifnull(attribute_id0,'') <> excluded.attribute_id0		THEN excluded.attribute_id0 ELSE attribute_id0 END,
-							
-							value1			=			CASE WHEN excluded.value1 IS NOT NULL			AND ifnull(value1,'') <> excluded.value1					THEN excluded.value1 ELSE value1 END,
-							sort1			=			CASE WHEN excluded.sort1 IS NOT NULL			AND ifnull(sort1,'') <> excluded.sort1					THEN excluded.sort1 ELSE sort1 END,
-							attribute_id1	=			CASE WHEN excluded.attribute_id1 IS NOT NULL	AND ifnull(attribute_id1,'') <> excluded.attribute_id1		THEN excluded.attribute_id1 ELSE attribute_id1 END,
-							
-							value2			=			CASE WHEN excluded.value2 IS NOT NULL			AND ifnull(value2,'') <> excluded.value2					THEN excluded.value2 ELSE value2 END,
-							sort2			=			CASE WHEN excluded.sort2 IS NOT NULL			AND ifnull(sort2,'') <> excluded.sort2					THEN excluded.sort2 ELSE sort2 END,
-							attribute_id2	=			CASE WHEN excluded.attribute_id2 IS NOT NULL	AND ifnull(attribute_id2,'') <> excluded.attribute_id2		THEN excluded.attribute_id2 ELSE attribute_id2 END,
-							
-							value3			=			CASE WHEN excluded.value3 IS NOT NULL			AND ifnull(value3,'') <> excluded.value3					THEN excluded.value3 ELSE value3 END,
-							sort3			=			CASE WHEN excluded.sort3 IS NOT NULL			AND ifnull(sort3,'') <> excluded.sort3					THEN excluded.sort3 ELSE sort3 END,
-							attribute_id3	=			CASE WHEN excluded.attribute_id3 IS NOT NULL	AND ifnull(attribute_id3,'') <> excluded.attribute_id3		THEN excluded.attribute_id3 ELSE attribute_id3 END,
-							
-							value4			=			CASE WHEN excluded.value4 IS NOT NULL			AND ifnull(value4,'') <> excluded.value4					THEN excluded.value4 ELSE value4 END,
-							sort4			=			CASE WHEN excluded.sort4 IS NOT NULL			AND ifnull(sort4,'') <> excluded.sort4					THEN excluded.sort4 ELSE sort4 END,
-							attribute_id4	=			CASE WHEN excluded.attribute_id4 IS NOT NULL	AND ifnull(attribute_id4,'') <> excluded.attribute_id4		THEN excluded.attribute_id4 ELSE attribute_id4 END,
-							
-							value5			=			CASE WHEN excluded.value5 IS NOT NULL			AND ifnull(value5,'') <> excluded.value5					THEN excluded.value5 ELSE value5 END,
-							sort5			=			CASE WHEN excluded.sort5 IS NOT NULL			AND ifnull(sort5,'') <> excluded.sort5					THEN excluded.sort5 ELSE sort5 END,
-							attribute_id5	=			CASE WHEN excluded.attribute_id5 IS NOT NULL	AND ifnull(attribute_id5,'') <> excluded.attribute_id5		THEN excluded.attribute_id5 ELSE attribute_id5 END,
-							
-							value6			=			CASE WHEN excluded.value6 IS NOT NULL			AND ifnull(value6,'') <> excluded.value6					THEN excluded.value0 ELSE value6 END,
-							sort6			=			CASE WHEN excluded.sort6 IS NOT NULL			AND ifnull(sort6,'') <> excluded.sort6					THEN excluded.sort6 ELSE sort6 END,
-							attribute_id6	=			CASE WHEN excluded.attribute_id6 IS NOT NULL	AND ifnull(attribute_id6,'') <> excluded.attribute_id6		THEN excluded.attribute_id6 ELSE attribute_id6 END,
-							
-							value7			=			CASE WHEN excluded.value7 IS NOT NULL			AND ifnull(value7,'') <> excluded.value7					THEN excluded.value0 ELSE value7 END,
-							sort7			=			CASE WHEN excluded.sort7 IS NOT NULL			AND ifnull(sort7,'') <> excluded.sort7					THEN excluded.sort7 ELSE sort7 END,
-							attribute_id7	=			CASE WHEN excluded.attribute_id7 IS NOT NULL	AND ifnull(attribute_id7,'') <> excluded.attribute_id7		THEN excluded.attribute_id7 ELSE attribute_id7 END,
-							
-							value8			=			CASE WHEN excluded.value8 IS NOT NULL			AND ifnull(value8,'') <> excluded.value8					THEN excluded.value8 ELSE value8 END,
-							sort8			=			CASE WHEN excluded.sort8 IS NOT NULL			AND ifnull(sort8,'') <> excluded.sort8					THEN excluded.sort8 ELSE sort8 END,
-							attribute_id8	=			CASE WHEN excluded.attribute_id8 IS NOT NULL	AND ifnull(attribute_id8,'') <> excluded.attribute_id8		THEN excluded.attribute_id8 ELSE attribute_id8 END,
-							
-							value9			=			CASE WHEN excluded.value9 IS NOT NULL			AND ifnull(value9,'') <> excluded.value9					THEN excluded.value9 ELSE value9 END,
-							sort9			=			CASE WHEN excluded.sort9 IS NOT NULL			AND ifnull(sort9,'') <> excluded.sort9					THEN excluded.sort9 ELSE sort9 END,
-							attribute_id9	=			CASE WHEN excluded.attribute_id9 IS NOT NULL	AND ifnull(attribute_id9,'') <> excluded.attribute_id9		THEN excluded.attribute_id9 ELSE attribute_id9 END,
-							
-
-							utimestamp0		=	CASE WHEN excluded.value0 IS NOT NULL	AND ifnull(value0,'') <> excluded.value0	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp0 END,
-							utimestamp1		=	CASE WHEN excluded.value1 IS NOT NULL	AND ifnull(value1,'') <> excluded.value1	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp1 END,
-							utimestamp2		=	CASE WHEN excluded.value2 IS NOT NULL	AND ifnull(value2,'') <> excluded.value2	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp2 END,
-							utimestamp3		=	CASE WHEN excluded.value3 IS NOT NULL	AND ifnull(value3,'') <> excluded.value3	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp3 END,
-							utimestamp4		=	CASE WHEN excluded.value4 IS NOT NULL	AND ifnull(value4,'') <> excluded.value4	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp4 END,
-							utimestamp5		=	CASE WHEN excluded.value5 IS NOT NULL	AND ifnull(value5,'') <> excluded.value5	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp5 END,
-							utimestamp6		=	CASE WHEN excluded.value6 IS NOT NULL	AND ifnull(value6,'') <> excluded.value6	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp6 END,
-							utimestamp7		=	CASE WHEN excluded.value7 IS NOT NULL	AND ifnull(value7,'') <> excluded.value7	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp7 END,
-							utimestamp8		=	CASE WHEN excluded.value8 IS NOT NULL	AND ifnull(value8,'') <> excluded.value8	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp8 END,
-							utimestamp9		=	CASE WHEN excluded.value9 IS NOT NULL	AND ifnull(value9,'') <> excluded.value9	THEN cast(strftime('%s', 'now') as int) ELSE utimestamp9 END,
-
-							itimestamp0		=	CASE WHEN excluded.value0 IS NOT NULL	AND itimestamp0 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp0 END,
-							itimestamp1		=	CASE WHEN excluded.value1 IS NOT NULL	AND itimestamp1 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp1 END,
-							itimestamp2		=	CASE WHEN excluded.value2 IS NOT NULL	AND itimestamp2 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp2 END,
-							itimestamp3		=	CASE WHEN excluded.value3 IS NOT NULL	AND itimestamp3 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp3 END,
-							itimestamp4		=	CASE WHEN excluded.value4 IS NOT NULL	AND itimestamp4 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp4 END,
-							itimestamp5		=	CASE WHEN excluded.value5 IS NOT NULL	AND itimestamp5 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp5 END,
-							itimestamp6		=	CASE WHEN excluded.value6 IS NOT NULL	AND itimestamp6 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp6 END,
-							itimestamp7		=	CASE WHEN excluded.value7 IS NOT NULL	AND itimestamp7 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp7 END,
-							itimestamp8		=	CASE WHEN excluded.value8 IS NOT NULL	AND itimestamp8 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp8 END,
-							itimestamp9		=	CASE WHEN excluded.value9 IS NOT NULL	AND itimestamp9 IS NULL						THEN cast(strftime('%s', 'now') as int) ELSE itimestamp9 END
-						"); #CURRENT_TIMESTAMP 1665989041
-			#itimestamp =	CASE WHEN excluded.itimestamp IS NULL THEN excluded.cast(strftime('%s', 'now') as int) ELSE itimestamp END
-		}
-		#echo 'III.'.(microtime(true)-$s).'s<br>';
-		if ($D_ALLDELETE??false) {
-			#echo "DELETE ALL<br>";
-			#echo "<br>DELETE FROM wp_data WHERE (id || type_id || platform_id) IN ({$D_ALLDELETE})";
-			$this->SQL->query("DELETE FROM wp_data WHERE {$D_ALLDELETE}"); #Lösche Vater
-			$this->SQL->query("DELETE FROM wp_data_att WHERE {$D_ALLDELETE}");
-			$this->SQL->query("DELETE FROM wp_data_att_slot WHERE {$D_ALLDELETE}");
-			$this->SQL->query("DELETE FROM wp_data_child WHERE {$D_ALLDELETE}");
-
-			#Lösche weitere unter Ebenen. 'ToDo: Je mehr Ebenen, desto heufiger muss diese ausgeführt werden um entgültig zu bereinigen! D.h. es kann erst beim nächsten Delete restlichen Daten von anderen Delete beseitigen.
-			$this->SQL->query("DELETE FROM wp_data AS dt2 WHERE 
-								NOT EXISTS (SELECT 1 FROM wp_data WHERE dt2.parent_data_id = id AND  dt2.parent_type_id  = type_id)
-								AND parent_data_id <> ''"); #Lösche RefIds
-
-			#Lösche verwaiste Kinder Zweige aus wp_data_att ToDo: Performance Problem
-			$this->SQL->query("DELETE FROM wp_data_att AS dta2 WHERE 
-				NOT EXISTS (SELECT 1 FROM wp_data WHERE dta2.id = id AND dta2.type_id = type_id )
-			");
-			$this->SQL->query("DELETE FROM wp_data_att_slot AS dta2 WHERE 
-				NOT EXISTS (SELECT 1 FROM wp_data WHERE dta2.id = id AND dta2.type_id = type_id )
-			");
-		}
-		if ($D_DATA_ATT??false) { #Lösche leeres Attribut
-			#echo "DELETE FROM wp_data_att WHERE {$D_DATA_ATT}<br>";
-			##$this->SQL->query("DELETE FROM wp_data_att WHERE (id || type_id || attribute_id) IN ({$D_DATA_ATT})");
-			$this->SQL->query("DELETE FROM wp_data_att WHERE {$D_DATA_ATT}");
-		}
-
-		if ($D_DATA??false) { #Lösche leeres Attribut
-			#echo "DELETE DATA => {$D_DATA}<br>";
-			$this->SQL->query("DELETE FROM wp_data WHERE {$D_DATA}");
-		}
-		
-	}
-	function set_object_reqursive(&$D = null) #$_to_id bei Funktion aufrunff nicht nutzen!
-	{
-		static $stLevel = 0;
-		$this->set_object($D);
-
-		$_savepattern = $this->PATTERN;
-		#Prüfe auf weitere Knotten
-		foreach ((array) $D as $kType => $Type) {
-			
-			if ($this->PATTERN[$kType]??false) { #Pattern: Überprüft ob erlaubtes Type übergeben wurde
-				$d=null;
-				$d['PATH_HASH'] = hash("crc32b", $D['PATH_HASH'].$kType);
-				
-				if($_savepattern[$kType]['D']??null) { #Ist eine Weitere Ebene verfügbar?
-					$this->PATTERN = $_savepattern[$kType]['D'];
-
-					foreach ((array) $Type['D'] as $kSup => $Sup) {
-
-
-						if ($Sup['Active']??false != -2) {
-							#Wenn das Objekt weitere Knoten beinhaltet, dann reqursive diese ebenfalls anlegen.
-							foreach ((array) $Sup as $kATT => $ATT) {
-								if (is_array($ATT) && isset($ATT['D'])) { 
-
-			##echo "Parent: {$kType}-{$kSup} | <br>";					
-
-
-									foreach ((array) $ATT['D'] as $kSubATT => $SubATT) { #setze für jedes Attribute Parent ID
-										
-										$d[$kATT]['D'][$kSubATT] = &$ATT['D'][$kSubATT]; #ToDo: wird überschrieben und die untere Zeile wird nur die letzte ID zugewiesen!!
-										##$d[$kATT]['D'][$kSubATT] = array_replace_recursive(($d[$kATT]['D'][$kSubATT]??[]),($ATT['D'][$kSubATT]??[]));
-										$d[$kATT]['D'][$kSubATT][$kType] = $kSup; #Es können unterschiedliche IDs sein!
-										###echo "{$kATT}-{$kSubATT}-{$kType} = ".implode(',',(array)$d[$kATT]['D'][$kSubATT][$kType])."<br>";
-										
-										#Path_hash2 wird mit (Parent_Type+Parent_id)+(Child_type+Child_id) generiert.
-										##echo "{$kATT}-{$kSubATT} = ".($D[$kType]['D'][$kSup]['PATH_HASH2']??'')."-{$kType}-{$kSup} <br>";
-										##$_hPATH = hash("crc32b", ($D[$kType]['D'][$kSup]['PATH_HASH2']??'').$kType.$kSup);
-										##$d[$_hPATH][$kATT]['D'][$kSubATT] = &$ATT['D'][$kSubATT];
-										##$d[$_hPATH][$kATT]['D'][$kSubATT]['PATH_HASH2'] = $_hPATH;
-										
-
-										#echo $kATT.'>'.$kType.' : ';
-									}
-									$this->PATTERN[$kATT][$kType] = ['Type' => 'id']; #Füge temporär Parent mit Id, damit in der höheren Ebene die ID zum Parent gespeichert werden kann.
-								}
-							}
-
-						}
-					}
-##print_R($d);
-					$stLevel++;
-					$this->set_object_reqursive($d);
-					$stLevel--;
-					$this->PATTERN = $_savepattern; #Wiederherstelle Pattern
-				}
-			}
-		}
-
-		if($stLevel == 0 && $this->refreshCacheObjeckt) {
-			$this->_set_cache(); //führt Cache nur einmal am ende aus!
-		}
-	}
 
 	/**
 	 * Erzeugt ein float Wert aus einem Text Folge und kann für Sortierung in der Datenbank verwendet werden
@@ -625,402 +299,8 @@ class CData
 		}
 		return (float)"{$pre}.{$hash}";
 	}
-	private function _set_cache()
-	{
-		#$s = microtime(true);
-		#echo (microtime(true)-$s).'s<br>';
-		#ToDo: Performance Optimierung, wenn Nur nach aktuellen Pattern Typen selektiert wird
 
-		#Lösche alte temp Einträge 1.2
-		#$this->SQL->query("DELETE FROM wp_data_cache AS dtmp WHERE EXISTS (SELECT 1 FROM wp_data_att WHERE id = dtmp.id AND utimestamp > dtmp.utimestamp)");
-		#$this->SQL->query("DELETE FROM wp_data_cache AS dtmp WHERE EXISTS (SELECT 1 FROM wp_data WHERE id = dtmp.id AND utimestamp > dtmp.utimestamp)");
-		/*$this->SQL->query("DELETE FROM wp_data_cache AS dtmp WHERE 
-			EXISTS (SELECT 1 FROM wp_data_att WHERE id = dtmp.id AND utimestamp > dtmp.utimestamp)
-			OR EXISTS (SELECT 1 FROM wp_data WHERE id = dtmp.id AND utimestamp > dtmp.utimestamp)
-		");
-		*/
-		$W??='';
-		foreach((array)$this->refreshCacheObjeckt AS $_kT => $T) {
-			$W .= ($W?' OR ':'')." ( (path_hash || type_id) = '{$_kT}' ";
-			if($T){
-				$_W = '';
-				foreach((array)$T AS $_kID => $ID) {
-					$_W .= ($_W?',':'')." '{$ID}' ";
-				}
-				$W .= " AND id IN ({$_W}) ";
-			}
-			$W .= " ) ";
-		}
-		
-		$this->SQL->query("DELETE FROM wp_data_cache AS dtmp WHERE {$W}");
-		#echo "1.".(microtime(true)-$s).'s<br>';$s = microtime(true);
-		
-		#wenn nichtg im Cache dann
-		/*$qry = $this->SQL->query("SELECT id, type_id, attribute_id, value
-											FROM wp_data_att dat
-											WHERE NOT EXISTS (SELECT 1 FROM wp_data_cache WHERE dat.id = id AND dat.type_id = type_id )
-											");
-											*/
-	
-		$qry = $this->SQL->query("SELECT id, type_id, path_hash,
-			attribute_id0, value0,
-			attribute_id1, value1,
-			attribute_id2, value2,
-			attribute_id3, value3,
-			attribute_id4, value4,
-			attribute_id5, value5,
-			attribute_id6, value6,
-			attribute_id7, value7,
-			attribute_id8, value8,
-			attribute_id9, value9
-		FROM wp_data_att_slot dat
-		WHERE {$W}
-		");
-
-		while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-			for($i=0;$i< 10; $i++) {
-				if($a['value'.$i]) {
-					$set_d[$a['path_hash']][$a['type_id']]['D'][$a['id']][ $a['attribute_id'.$i] ] = $a['value'.$i];
-					
-				}
-			}
-		}
-
-		#Speichere Sprach Attribute ab
-		$qry = $this->SQL->query("SELECT id, type_id, path_hash, attribute_id, value
-		FROM wp_data_att dat
-		WHERE {$W}
-		");
-		while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-			$set_d[$a['path_hash']][$a['type_id']]['D'][$a['id']][$a['attribute_id']] = $a['value'];
-		}
-
-		#echo "2.".(microtime(true)-$s).'s<br>';$s = microtime(true);
-		#Speichere Ids #Ids ausgeben; Ids sind nicht in Pattern enthalten, dadurch erkennt man dass dies Ids sind. Diese werden nur in temp gespeichert.
-		/*
-		$qry = $this->SQL->query("SELECT dt.id, dt.type_id
-											,dt.parent_data_id , dt.parent_type_id 
-											FROM wp_data dt
-											WHERE NOT EXISTS (SELECT 1 FROM wp_data_cache WHERE dt.id = id AND dt.type_id = type_id )
-											");
-		*/
-		$qry = $this->SQL->query("SELECT dt.id, dt.type_id, dt.path_hash
-			,dt.parent_data_id , dt.parent_type_id 
-			FROM wp_data dt
-			WHERE {$W}
-		");
-		while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-			##if ($a['parent_data_id']) { #ToDo: Was passiert, wenn für ein Type mehrere Ids gespeichert wurden? Momentan wird die letzte ausgegeben. Und wenn an gleiches Type anderes Value gesendet wird, wird neu angelegt statt ersetzt.
-				
-				$set_d[ $a['path_hash'] ][$a['type_id']]['D'][$a['id']][$a['parent_type_id']]??='';
-				$set_d[ $a['path_hash'] ][$a['type_id']]['D'][$a['id']][$a['parent_type_id']] .= (($set_d[$a['type_id']]['D'][$a['id']][$a['parent_type_id']])??false ? '|' : '') . $a['parent_data_id'];
-			##}
-		}
-		#echo "3.".(microtime(true)-$s).'s<br>';$s = microtime(true);
-		##print_r($set_d);
-		#Speichere neue Daten im Cache
-		#Erstelle Cache
-		$IU_DATA_ATT = '';
-		foreach ((array) $set_d as $kPath => $Path) {
-			foreach ((array) $Path as $kType => $Type) {
-				foreach ((array) $Type['D'] as $kSup => $Sup) {
-					
-					$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$kPath}'";
-					
-					$json = $this->SQL->escapeString(json_encode($Sup));
-					
-					#$IU_DATA_ATT .= ",'" . (($json  != '{"":""}')?$json:'') . "'";
-					$IU_DATA_ATT .= ",'" . str_replace([',"":""','"":"",','"":""'],'',$json) . "'"; #replace entfernt leere Key Werte
-					
-					$IU_DATA_ATT .= ")";
-				}
-			}
-		}
-		#echo "4.".(microtime(true)-$s).'s<br>';$s = microtime(true);
-		if ($IU_DATA_ATT) {
-			#$this->SQL->query("REPLACE INTO wp_data_cache (id, type_id, data) VALUES {$IU_DATA_ATT}");
-			
-			$this->SQL->query("REPLACE INTO wp_data_cache (id, type_id, path_hash,data) VALUES {$IU_DATA_ATT} 
-								ON CONFLICT(id, type_id, path_hash) DO UPDATE SET
-									data =			CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data		THEN excluded.data ELSE data END,
-									utimestamp =	CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data
-													THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
-								");
-								
-		}
-		#echo "5.".(microtime(true)-$s).'s<br>';$s = microtime(true);
-		#Lösche verwaiste Cache Daten
-		#ToDo: in die Clear Funktion zufügen. Bereinigung der DB muss nicht bei jedem Speichern erfolgen.
-		####$this->SQL->query("DELETE FROM wp_data_cache AS dtmp WHERE NOT EXISTS (SELECT 1 FROM wp_data WHERE id = dtmp.id AND dtmp.type_id = type_id)");
-		#echo "6.".(microtime(true)-$s).'s<br>';$s = microtime(true);
-		#Erstelle Child_count
-		
-		
-		#ToDo: Nur dann auslösen für Type, wenn für Kind deletes oder neue Datensätze dazu gekommen sind, auslösen.
-		#ToDo: Parent path_hash wird nicht übergeben!
-		$ids = implode("','",array_keys($this->refreshCacheObjeckt));
-		
-		$this->SQL->query("REPLACE INTO wp_data_child (id, type_id, child_path_hash, child_type_id, child_count) 
-								SELECT parent_data_id, parent_type_id, path_hash, type_id, count(*) FROM wp_data
-								WHERE (path_hash || type_id) IN ('{$ids}')
-								GROUP BY parent_data_id,path_hash,type_id
-								");
-		
-		#echo "7.".(microtime(true)-$s).'s<br>';
-	}
-
-
-	private function get_object(&$D = null, &$F= null)
-	{
-		$F['PATH_HASH']??='';
-		foreach ((array) $F as $kType => $Type) {
-			if ($this->PATTERN[$kType]??null) {
-				
-				##echo "GET Kind: ".implode(',',(array)$Type['WW']['PATH_HASH2'])."<br>";
-
-				$W = $L = $O = NULL;
-				$F[$kType]['W']??=null;
-				foreach ((array) $F[$kType]['W'] as $kR => $R) {
-					$W .= (($W) ? ' OR ' : ' AND ( ') . ' ( ';
-					$W_ATT = $W_toID = $W_ID = $W1 = '';
-					foreach ((array) $R as $kWW => $WW) {
-						if(!($WW['W']??false)) {#Prüft ob eine unter Where Abfrage des Kindes beinhaltet!
-						$WW = (is_array($WW)) ? implode("','", $WW) : $WW; #Prüfe ob Array übergeben wurde
-
-						$_kWW = explode('|',$kWW);#Splittet Attribut|Anweisung
-						
-
-						if (($_kWW[0]??false) == 'ID' ) {
-							$W_ID .= (($W_ID) ? ' AND ' : '') . " dtmp.id IN ('{$WW}') AND dtmp.type_id = '{$kType}' AND path_hash = '{$F['PATH_HASH']}' "; # AND (dtmp.path = '{$this->path}' OR dtmp.path = '')
-
-						} elseif (($this->PATTERN[$kType][$_kWW[0]]['Type']??null) == 'id') {
-							
-							###$W_toID .= (($W_toID) ? ' AND ' : '') . " dtmp.id IN (SELECT id FROM wp_data WHERE parent_type_id IN ('{$_kWW[0]}') AND parent_data_id IN ('{$WW}') ) ";
-
-							##$W_toID .= (($W_toID) ? ' AND ' : '') . " dt.parent_type_id IN ('{$_kWW[0]}') AND dt.parent_data_id IN ('{$WW}')  ";
-
-							$W_toID .= (($W_toID) ? ' AND ' : '') . "EXISTS (SELECT 1 FROM wp_data dt WHERE dtmp.id = dt.id AND dtmp.type_id = dt.type_id AND dt.parent_type_id IN ('{$_kWW[0]}') AND dt.parent_data_id IN ('{$WW}') ) AND path_hash = '{$F['PATH_HASH']}' ";
-
-						} else {
-							
-							$this->PATTERN[$kType][$_kWW[0]]['Slot']??='';
-							
-							$_W = " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} IN ('{$WW}') ";
-							if($_kWW[1]??null) {
-								$_W = ($_kWW[1] == 'NOTIN') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} NOT IN ('{$WW}') " : $_W;
-
-								$_W = ($_kWW[1] == 'LIKE-%') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} LIKE '{$WW}%' " : $_W;
-								$_W = ($_kWW[1] == 'LIKE%-') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} LIKE '%{$WW}' " : $_W;
-								$_W = ($_kWW[1] == 'LIKE%%') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} LIKE '%{$WW}%' " : $_W;
-								$_W = ($_kWW[1] == 'NOTLIKE') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} NOT LIKE '{$WW}' " : $_W;
-
-								$_W = ($_kWW[1] == '<>') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} <> '{$WW}' " : $_W;
-								$_W = ($_kWW[1] == '=') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} = '{$WW}' " : $_W;
-								$_W = ($_kWW[1] == '>=') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} >= '{$WW}' " : $_W;
-								$_W = ($_kWW[1] == '<=') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} <= '{$WW}' " : $_W;
-								$_W = ($_kWW[1] == '>') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} > '{$WW}' " : $_W;
-								$_W = ($_kWW[1] == '<') ? " value{$this->PATTERN[$kType][$_kWW[0]]['Slot']} < '{$WW}' " : $_W;
-							}
-
-							#$W_ATT .= (($W_ATT) ? ' AND ' : '') . " EXISTS (SELECT dtmp.id FROM wp_data_att WHERE dtmp.id = id AND dtmp.type_id = type_id AND attribute_id IN ('{$_kWW[0]}') AND {$_W} ) ";
-							if(isset($this->PATTERN[$kType][$_kWW[0]]['Row']) && isset($this->PATTERN[$kType][$_kWW[0]]['Slot'])) {
-								$W_ATT .= (($W_ATT) ? ' AND ' : '') . " EXISTS (SELECT dtmp.id FROM wp_data_att_slot WHERE dtmp.id = id AND dtmp.type_id = type_id AND row_id = '{$this->PATTERN[$kType][$_kWW[0]]['Row']}' AND attribute_id{$this->PATTERN[$kType][$_kWW[0]]['Slot']} IN ('{$_kWW[0]}') AND {$_W} ) AND path_hash = '{$F['PATH_HASH']}' ";
-							} else {
-								$W_ATT .= (($W_ATT) ? ' AND ' : '') . " EXISTS (SELECT dtmp.id FROM wp_data_att WHERE dtmp.id = id AND dtmp.type_id = type_id AND attribute_id IN ('{$_kWW[0]}') AND {$_W} ) AND path_hash = '{$F['PATH_HASH']}' ";
-							}
-						}
-
-						} elseif ($this->PATTERN[$kType]['D'][$kWW]??false) { #Überprüft Filter von Solcher Strucktur: $D2['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ID'] = ['A1'];
-							#ToDo100: Rekursive erweitern, damit auch weitere unter Where Abfragen mit abgefragtn werden! Und nicht nur IDs
-							$WW2 = (is_array($WW['W'][0]['ID'])) ? implode("','", $WW['W'][0]['ID']) : $WW['W'][0]['ID']; #Prüfe ob Array übergeben wurde
-							#$W_ID .= (($W_ID) ? ' AND ' : '') . " dtmp.id IN ('{$WW}') AND dtmp.type_id = '{$kType}' AND path_hash = '{$F['PATH_HASH']}' "; 
-							$W_ID .= (($W_ID) ? ' AND ' : '') . " EXISTS (SELECT id FROM wp_data WHERE id IN ('{$WW2}') AND type_id = '{$kWW}' AND parent_data_id = dtmp.id AND parent_type_id = dtmp.type_id ) "; #ToDo: AND path_hash = '{$F['PATH_HASH']}'
-							
-						}
-					}
-					$W1 .= ($W_ID) ? " {$W_ID} " : '';
-					#$W1 .= ($W_ATT) ? (($W1) ? ' AND ' : '') . " EXISTS (SELECT dtmp.id FROM wp_data_att WHERE dtmp.id = id AND dtmp.type_id = type_id AND {$W_ATT}) " : '';
-					$W1 .= ($W_ATT) ? (($W1) ? ' AND ' : '') . " {$W_ATT} " : '';
-					
-					#$W1 .= ($W_toID) ? (($W1) ? ' AND ' : '') . " dtmp.id IN (SELECT id FROM wp_data WHERE {$W_toID} ) " : '';
-					$W1 .= ($W_toID) ? (($W1) ? ' AND ' : '') . " {$W_toID} " : '';
-					$W .= $W1;
-					$W .= ") ";
-				}
-				$W .= ($W) ? ") " : '';
-
-				$L = (isset($F[$kType]['L']['STEP'])) ? "LIMIT 0,{$F[$kType]['L']['STEP']}" : $L;
-				$L = (isset($F[$kType]['L']['START']) && $F[$kType]['L']['STEP']) ? "LIMIT {$F[$kType]['L']['START']},{$F[$kType]['L']['STEP']}" : $L;
-
-				if ($F[$kType]['O']??false) {
-					foreach ((array) $F[$kType]['O'] as $kR => $R) {
-						foreach ((array) $R as $key => $value) {
-							if ($_kWW[0] == 'ID') {
-								$O .= (($O) ? ',' : '') . " dtmp.id {$value} ";
-							} elseif ($this->PATTERN[$kType][$key]['Type'] == 'id') {
-								$O .= (($O) ? ',' : '') . " (SELECT id FROM wp_data WHERE dtmp.id = id AND dtmp.type_id = type_id AND dtmp.path_hash = path_hash AND parent_type_id = '{$key}' ) {$value}";
-							} else {
-								if(isset($this->PATTERN[$kType][$key]['Row']) && isset($this->PATTERN[$kType][$key]['Slot'])) {
-									#$O .= (($O) ? ',' : '') . " (SELECT ".(( in_array($this->PATTERN[$kType][$key]['Type'], ['number', 'checkbox']))? " CAST(value{$this->PATTERN[$kType][$key]['Slot']} AS REAL)":" value{$this->PATTERN[$kType][$key]['Slot']} ")." FROM wp_data_att_slot WHERE dtmp.id = id AND dtmp.type_id = type_id AND row_id = '{$this->PATTERN[$kType][$key]['Row']}' AND attribute_id{$this->PATTERN[$kType][$key]['Slot']} = '{$key}' ) {$value}";
-									$O .= (($O) ? ',' : '') . " (SELECT sort{$this->PATTERN[$kType][$key]['Slot']} FROM wp_data_att_slot WHERE dtmp.id = id AND dtmp.type_id = type_id AND dtmp.path_hash = path_hash AND row_id = '{$this->PATTERN[$kType][$key]['Row']}' AND attribute_id{$this->PATTERN[$kType][$key]['Slot']} = '{$key}' ) {$value}";
-								}
-								else {
-									#$O .= (($O) ? ',' : '') . " (SELECT ".(( in_array($this->PATTERN[$kType][$key]['Type'], ['number', 'checkbox']))? " CAST(value AS REAL)":" value ")." FROM wp_data_att WHERE dtmp.id = id AND dtmp.type_id = type_id AND attribute_id = '{$key}' ) {$value}";
-									$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att WHERE dtmp.id = id AND dtmp.type_id = type_id AND dtmp.path_hash = path_hash AND attribute_id = '{$key}' ) {$value}";
-								}
-								
-							}
-						}
-					}
-					$O = ($O) ? "ORDER BY {$O}" : '';
-				}
-
-				if(!isset($F[$kType]['L']['STEP']) || $F[$kType]['L']['STEP'] > 0) {
-						$qry = $this->SQL->query("SELECT dtmp.id, dtmp.type_id, data 
-										FROM wp_data_cache dtmp
-										WHERE dtmp.type_id = '{$kType}'
-										{$W} {$O} {$L}");
-					
-
-					while ($a = $qry->fetchArray(SQLITE3_NUM)) {
-						$D[$a[1]]['D'][$a[0]] = array_replace_recursive((array)($D[$a[1]]['D'][$a[0]]??[]),(array) json_decode($a[2], 1));
-						
-						#Baut PARENT referenz auf, erforderlich für reqursive Aufruf für die Performance
-						
-						foreach ((array) $this->PATTERN[$a[1]] as $_kATT => $_ATT) {
-							if (($_ATT['Type']??false) == 'id') {
-
-								#Aggregierungsfunktionen ================
-								if ($F[$a[1]]['A']??false) {
-									foreach ((array) $F[$a[1]]['A'] as $kAG => $AG) {
-										if (in_array('SUM', (array)$AG) || in_array('AVG', (array)$AG)) { #AVG benötigt SUM
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['SUM']??=0;
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['SUM'] += $D[$a[1]]['D'][$a[0]][$kAG];
-										}
-										if (in_array('COUNT', (array)$AG) || in_array('AVG', (array)$AG)) { #AVG benötigt COUNT
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['COUNT']??=0;
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['COUNT']++;
-										}
-										if (in_array('MIN', (array)$AG)) {
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MIN']??=0;
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MIN'] = (is_null($D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MIN']) || $D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MIN'] > $D[$a[1]]['D'][$a[0]][$kAG]) ? $D[$a[1]]['D'][$a[0]][$kAG] : $D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MIN'];
-										}
-										if (in_array('MAX', (array)$AG)) {
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MAX'] ??=0;
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MAX'] = (is_null($D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MAX']) || $D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MAX'] < $D[$a[1]]['D'][$a[0]][$kAG]) ? $D[$a[1]]['D'][$a[0]][$kAG] : $D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['MAX'];
-										}
-										if (in_array('AVG', (array)$AG)) {
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['AVG']??=0;
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['AVG'] =
-											$D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['SUM'] / $D[$_kATT]['D'][$D[$a[1]]['D'][$a[0]][$_kATT]]['CHILD'][$a[1]]['A'][$kAG]['COUNT'];
-										}
-									}
-								}
-								#================================================
-								
-								$D[$_kATT]['D'][ ($D[$a[1]]['D'][$a[0]][$_kATT]??null) ]['CHILD'][$a[1]]['D'][$a[0]] = &$D[$a[1]]['D'][$a[0]];
-
-							}
-							
-						}
-					}
-				}
-				
-				#gibt Count aus
-				#ToDo: count in Level2 Cache verlagern. Die Tabelle wp_data_child wäre somit überflüssig
-				$qry = $this->SQL->query("SELECT dtc.id, dtc.type_id, child_type_id, child_count, child_path_hash
-											FROM wp_data_child dtc
-											WHERE child_type_id = '{$kType}' AND child_path_hash = '{$F['PATH_HASH']}' 
-											AND EXISTS (SELECT 1 FROM wp_data dtmp WHERE dtc.id = dtmp.parent_data_id AND dtc.type_id = dtmp.parent_type_id AND dtc.child_path_hash = dtmp.path_hash {$W})
-										");
-				while ($a = $qry->fetchArray(SQLITE3_NUM)) {
-					if($a[1]) {
-						$D[ $a[1] ]['D'][ $a[0] ]['CHILD'][ $a[2] ]['COUNT'] = $a[3]; #für Kinder
-					}
-					else {
-						$D[ $a[2] ]['COUNT'] = $a[3]; #für Parent
-					}
-					
-				}
-				
-			}
-		}
-	}
-
-
-		/**
-	 * $D = &$D
-	 * $F = optional können Filter übergabe werden um die Ausgabe einzuschrenken
-	 */
-	function get_object_reqursive(&$D = null, &$F = null)
-	{
-		static $stLevel = 0;
-		$this->get_object($D, $F);
-
-		$savePatern = $this->PATTERN;
-		foreach ((array) $F as $kType => $Type) {
-			
-			if ($this->PATTERN[$kType]??null) { #Ist Type in Pattern vorhanden?
-				
-				$this->PATTERN = $savePatern[$kType]['D']??=[];
-
-				foreach ((array) $this->PATTERN as $kPAT => $PAT) { #Durchlaufe alle Pattern
-					#echo  "{$kPAT} > ";
-
-					##$_PARENT_PATH_HASH2 = $F[$kType]['WW']['PATH_HASH2'];
-
-					if (isset($Type[$kPAT])) { #ist allgemeine Bedinung vorhande PLATFORM.WAREHOUSE
-						$f = $d = null; #$d muss je Durchgang resetet werden!
-						
-						#$d[$kPAT] = &$D[$kType][$kPAT];##ToDo: Prüfen ob übergabe Referenz keine Probleme bereitet.
-						###$d[$kPAT] = $D[$kType][$kPAT]; #Übergebe W-Bedinung als unter Abfrage  #ToDo: Wichtig, wird diese über $F Übergeben oder?
-						$f[$kPAT] = $Type[$kPAT];
-						
-						#Setze Filter nach Vater ID
-						if($D[$kType]['D']??null) {
-							foreach ((array) $D[$kType]['D'] as $kDat => $Dat) {
-								$f[$kPAT]['W'][0][$kType][] = $kDat;#Übergebe ID vom Vater #ToDo: Wenn OR gebaut wird, kann die Parent id nicht zur 100% wirken, muss außerhalb der WHERE And-OR Bedinung übergeben werden
-
-								#ToDo: Alle PATH_HASH2 übergeben
-								##$f[$kPAT]['WW']['PATH_HASH2'][] = hash("crc32b", $_PARENT_PATH_HASH2.$kType.$kDat);
-								##echo "GET: [{$kPAT}]-> ".implode(',',(array)$_PARENT_PATH_HASH2)."-{$kType}-{$kDat} = ".hash("crc32b", $_PARENT_PATH_HASH2.$kType.$kDat)." <br>";
-								
-							}
-							$this->PATTERN[$kPAT][$kType] = ['Type' => 'id']; #Füge temporär Parent mit Id, damit in der höheren Ebene die ID zum Parent gespeichert werden kann.
-							#$this->PATTERN[$kPAT]['PATH_HASH2'] = ['Type' => 'id'];
-							
-						
-						}
-						#echo '-A----------------<br>';
-						#print_r($d[$kPAT]['W']);
-						#echo '-E---------------<br>';
-						$f['PATH_HASH'] = hash("crc32b", ($F['PATH_HASH']??'').$kType);#Übergabe path_hash
-
-						
-						$stLevel++;
-						$this->get_object_reqursive($d,$f);
-						$stLevel--;
-
-						#Daten Zuordnung
-						if($d[$kType]['D']??null){
-							foreach ((array) $d[$kType]['D'] as $kATT2 => $ATT2) {
-								$D[$kType]['D'][$kATT2] = array_replace_recursive((array) ($D[$kType]['D'][$kATT2]??[]), (array) $d[$kType]['D'][$kATT2]['CHILD']);
-								
-							}
-						}
-						
-					}
-				}
-			}
-			$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
-		}
-
-		
-	}
-
-
-
-	function set_object_reqursive2(&$D = null, $Parent_Hash='', $Parent_Type = '', $Parent_Id = '' ) {
+	function set_object_reqursive(&$D = null, $Parent_Hash='', $Parent_Type = '', $Parent_Id = '' ) {
 		static $stLevel = 0;
 		
 		static $IU_DATA = '';
@@ -1055,7 +335,7 @@ class CData
 									
 									$stLevel++;
 									$this->PATTERN = $savePatern[$kType]['D']??=[];
-									$this->set_object_reqursive2($d,$_Parent_Hash,$kType,$kSup);
+									$this->set_object_reqursive($d,$_Parent_Hash,$kType,$kSup);
 									$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
 									$stLevel--;
 								}
@@ -1126,11 +406,11 @@ class CData
 			");
 			
 			#3. invalidiere Cache
-			$this->_set_cache2($_RefrechCache);
+			$this->_set_cache($_RefrechCache);
 		}
 	}
 	
-	private function _set_cache2(&$RefrechCache_PathHash=null) {
+	private function _set_cache(&$RefrechCache_PathHash=null) {
 		
 		if($RefrechCache_PathHash) {
 			
@@ -1191,37 +471,90 @@ class CData
 	}
 
 
-	function get_object_reqursive2(&$D = null, &$F=null, $Parent_Hash=[], $Parent_Type = '', $Parent_Id = '') {
+	function get_object_reqursive(&$D = null, &$F=null, $Parent_Hash=[], $Parent_Type = '', $Parent_Id = '') {
 		static $stLevel = 0;
-		
-		
-		
 		$D = ($stLevel==0)?['' => $D]:$D;
 		
-		##$savePatern = $this->PATTERN;
-		#1. Erstelle Bedinung
-		$W = $f = '';
-		
-			foreach((array)$F AS $kType => $Type) {
+		$savePatern = $this->PATTERN;
 
-					$kHash = ($Parent_Hash)?implode("','",(array)$Parent_Hash[$kType]):"";
-					$W .= ($W? ' OR ':'')." (dtmp.type_id = '{$kType}' AND dtmp.parent_path_hash IN ('{$kHash}') ) ";
-					$f = $F[ $kType ];
-
+		foreach((array)$F AS $kType => $Type) {
+			$W1 = $W = $L = $W_ID = '';
+			#1. Erstelle Bedinung
+			
+			$kHash = ($Parent_Hash)?implode("','",(array)$Parent_Hash[$kType]):"";
+			
+			
+			if($savePatern[$kType]['D']??null) { #Pürft ob weitere Ebene Vorhanden ist
+				$f = $F[ $kType ];
 			}
+
+			#W-Bedinung umsetzen=======================
+			if($Type['W']??false) {#Prüft ob für die Ebene ein W Bedinung exsistiert
+				foreach ((array) $F[$kType]['W'] as $kR => $R) {
+					$W .= (($W) ? ' OR ' : ' AND ( ') . ' ( ';
+					$W_ATT = '';
+					foreach ((array) $R as $kWW => $WW) {
+						if(!($WW['W']??false)) {
+							$WW = (is_array($WW)) ? implode("','", $WW) : $WW;
+							$_kWW = explode('|',$kWW);
+							if (($_kWW[0]??false) == 'ID' ) {
+								$W_ID = " AND dtmp.id IN ('{$WW}') "; # AND (dtmp.path = '{$this->path}' OR dtmp.path = '')
+							}
+							else {
+								$W_ATT .= (($W_ATT) ? ' AND ' : '') . "EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp.id = dt.id AND dtmp.type_id = dt.type_id AND dt.attribute_id IN ('{$_kWW[0]}') AND dt.value IN ('{$WW}') )";
+							}
+						}
+						else { #Unter W-Abfrage z.B: #$D2['PLATFORM']['W'][0]['ARTICLE']['W'][0]['ID'] #$this->PATTERN[$kType]['D'][$kWW]??false && 
+							#ToDo: Flexibler gestalten und recursive!!!
+							if ( isset($WW['W'][0]['ID']) ) {
+								$WW2 = (is_array($WW['W'][0]['ID'])) ? implode("','", $WW['W'][0]['ID']) : $WW['W'][0]['ID']; #Prüfe ob Array übergeben wurde
+								$W_ID = " AND EXISTS (SELECT id FROM wp_data WHERE id IN ('{$WW2}') AND path_hash = dtmp.path_hash ) ";
+							}
+							else {
+								foreach ((array) $WW['W'][0] AS $kWW2 => $vWW2) {
+									$WW2 = (is_array($WW['W'][0][$kWW2])) ? implode("','", $WW['W'][0][$kWW2]) : $WW['W'][0][$kWW2]; #Prüfe ob Array übergeben wurde
+									$W_ID = " AND EXISTS (SELECT 1 FROM wp_data_att dt WHERE dt.value IN ('{$WW2}') AND dt.attribute_id = '{$kWW2}' AND dt.path_hash = dtmp.path_hash ) ";
+								}
+							}
+						}
+					}
+					$W .= ($W_ATT) ? " {$W_ATT} " : '';
+					$W .= ") ";
+				}
+				$W .= ($W) ? ") " : '';
+				$W1 = ($W_ATT)?$W:'';
+			}
+			#W================================
 	
+			$W = " (dtmp.type_id = '{$kType}' AND dtmp.parent_path_hash IN ('{$kHash}') {$W_ID} ) {$W1}";
+			
+			#Todo: Limit muss pro Vater gehen
+			$L = (isset($F[$kType]['L']['STEP'])) ? "LIMIT 0,{$F[$kType]['L']['STEP']}" : $L;
+			$L = (isset($F[$kType]['L']['START']) && $F[$kType]['L']['STEP']) ? "LIMIT {$F[$kType]['L']['START']},{$F[$kType]['L']['STEP']}" : $L;
 
+			#Order By
+			$O = '';
+			if ($Type['O']??false) {
+				
+				foreach ((array) $F[$kType]['O'] as $kR => $R) {
+					foreach ((array) $R as $key => $value) {
+						if ($key == 'ID') {
+							$O .= (($O) ? ',' : '') . " dtmp.id {$value} ";
+						} else {
+							$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att WHERE dtmp.path_hash = path_hash AND attribute_id = '{$key}' ) {$value}";
+					
+						}
+					}
+				}
+				$O = ($O) ? "ORDER BY {$O}" : '';
+			}
 
-
-
-		
-		#2. Holle Daten
-		$_Hash = [];
-		if($W) {
+			#2. Holle Daten
+			$_Hash = null;
 			$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data 
 												FROM  wp_data_cache dtmp 
 												WHERE 1
-												AND ({$W})" );
+												AND ({$W}) {$L} {$O}" );
 			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
 				$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
 				$d[ $a['path_hash'] ] = &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
@@ -1230,25 +563,34 @@ class CData
 				foreach((array)$F[ $a['type_id'] ] AS $kChild => $Child) {
 					$_Hash[ $kChild ][] = $a['path_hash'] ;
 				}
-
 			}
-		
+	
+			#Lese Count aus
+			$kCilds = implode("','", (array)array_keys((array)$D));
+			$qry = $this->SQL->query("SELECT dtc.id, dtc.type_id, child_type_id, child_count, child_path_hash
+											FROM wp_data_child dtc
+											WHERE child_type_id = '{$kType}' 
+											AND dtc.child_path_hash IN ('{$kCilds}')
+										");#AND EXISTS (SELECT 1 FROM wp_data_cache dtmp WHERE dtc.child_path_hash = dtmp.parent_path_hash AND ({$W}) )
+			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+				$D[ $a['child_path_hash'] ][ $a['child_type_id'] ]['COUNT'] = $a['child_count'];
+			}
+
 			#3. gehe in die weitere Ebene
-			$stLevel++;
-			##$this->PATTERN = $savePatern[$kType]['D']??=[];
-			$this->get_object_reqursive2($d,$f,$_Hash);
-			##$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
-			$stLevel--;
-			
-
-
-			if($stLevel == 0) {
-				$D = $D[ '' ];
+			if(($savePatern[$kType]['D']??null) && $_Hash) { #$_Hash=Wenn Parents nicht vorhaden sind, dann gibt es auch keine kinder
+				$stLevel++;
+				$this->PATTERN = $savePatern[$kType]['D']??=[];
+				$this->get_object_reqursive($d,$f,$_Hash);
+				$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
+				$stLevel--;
 			}
-
+				
 		}
-		
-					
+
+		if($stLevel == 0) {
+			$D = $D[ '' ];
+		}
+
 	}
 
 }
