@@ -47,6 +47,9 @@
 
 ===============================
 ##Changelog:
+#2.02
+! Fix: kleine Fehler behebungen
+! Fix: get_object hat Daten diese bereits an die Funktion übergeben wurden, verschluckt.
 #2.01
 ~ Überarbeitung und vereinfachung der get und set Funktionen - Code
 ~ Performance Optimierung
@@ -97,7 +100,7 @@ class CData
 	 * 'PATTERN'	=> Pattern
 	 * 'DB'			=> [FILENAME,FLAGS] Datenbank Zugang
 	*/
-	function __construct($P)
+	function __construct($P=null)
 	{
 		if($P['DB']) {
 			if(file_exists($P['DB']['FILENAME'])) {
@@ -556,7 +559,11 @@ class CData
 												WHERE 1
 												AND ({$W}) {$L} {$O}" );
 			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-				$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
+				#$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
+				
+				$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = array_replace_recursive(
+					(array) $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']],
+					(array) json_decode($a['data'], 1)); #recursive weil Daten die an die Funktion übergeben wurden, ebenfalls übernohmen werden müssen
 				$d[ $a['path_hash'] ] = &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
 
 				#Kind
