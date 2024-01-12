@@ -3,6 +3,7 @@
  * Pattern Beispiel: 
   $D['PATTERN']['PLATFORM']['D']['MANUFACTURER'] = [
 	'Active'		=> ['Type' => 'checkbox'],
+	'ParentId'		=> ['Type' => 'id', 'ForeignKey' => 1], #ForeignKey: Beim Pattern kann = 1 übergeben werden. Dadurch kann man ein Feld als Fremdschlüssel kennzeichnen. Bei der Ausgabe wird PARENT->CHILD ausgabe generiert, so dass auch nach Fremdschlüssel selekitert wird.
 	];
  ## Mögliche Attribute: #ToDo: Attribute umsetzen:
  - Type : id, string, number
@@ -47,6 +48,10 @@
 
 ===============================
 ##Changelog:
+#2.03
+! Fix: WHERE Abfrage überarbeitet, IDs können nun auch in OR Kombinationen unabhängig verwendet werden
+~ Funktionen get_object_recursive und set_object_recursive in get_object und set_object umbennant.
++ ForeignKey: Beim Pattern kann = 1 übergeben werden. Dadurch kann man ein Feld als Fremdschlüssel kennzeichnen. Bei der Ausgabe wird PARENT->CHILD ausgabe generiert, so dass auch nach Fremdschlüssel selekitert wird.
 #2.02
 ! Fix: kleine Fehler behebungen
 ! Fix: get_object hat Daten diese bereits an die Funktion übergeben wurden, verschluckt.
@@ -303,7 +308,7 @@ class CData
 		return (float)"{$pre}.{$hash}";
 	}
 
-	function set_object_reqursive(&$D = null, $Parent_Hash='', $Parent_Type = '', $Parent_Id = '' ) {
+	function set_object(&$D = null, $Parent_Hash='', $Parent_Type = '', $Parent_Id = '' ) {
 		static $stLevel = 0;
 		
 		static $IU_DATA = '';
@@ -315,7 +320,8 @@ class CData
 		$savePatern = $this->PATTERN;
 		foreach ((array) $D AS $kType => $Type) { ##[PlATFORM]
 			
-			if ($this->PATTERN[$kType]??false) { #Prüfe in Pattern ob diese erlaubt sind
+			if (($this->PATTERN[$kType]??false) && is_array($Type)) { #Prüfe in Pattern ob diese erlaubt sind
+				
 				
 				foreach ((array) $Type['D'] AS $kSup => $Sup) { #PlATFORM.D[x]
 				
@@ -338,7 +344,7 @@ class CData
 									
 									$stLevel++;
 									$this->PATTERN = $savePatern[$kType]['D']??=[];
-									$this->set_object_reqursive($d,$_Parent_Hash,$kType,$kSup);
+									$this->set_object($d,$_Parent_Hash,$kType,$kSup);
 									$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
 									$stLevel--;
 								}
@@ -474,8 +480,9 @@ class CData
 	}
 
 
-	function get_object_reqursive(&$D = null, &$F=null, $Parent_Hash=[], $Parent_Type = '', $Parent_Id = '') {
+	function get_object(&$D = null, &$F=null, $Parent_Hash=[], $Parent_Type = '', $Parent_Id = '') {
 		static $stLevel = 0;
+		
 		$D = ($stLevel==0)?['' => $D]:$D;
 		
 		$savePatern = $this->PATTERN;
@@ -487,12 +494,58 @@ class CData
 			$kHash = ($Parent_Hash)?implode("','",(array)$Parent_Hash[$kType]):"";
 			
 			
+			#Durlaufe alle Felder um Informationen dazu zu erhalten, wei z.B: Type, ForeignKey
+			foreach((array) $savePatern[$kType] AS $kPF => $PF) {
+				#Filtere ForeignKey Felder heraus
+				if ($PF['ForeignKey']) {#Ist Fremdschlüssel?
+					$ForeignKeys[$kPF] = $PF['ForeignKey'];
+				}
+			}
+			
+
 			if($savePatern[$kType]['D']??null) { #Pürft ob weitere Ebene Vorhanden ist
 				$f = $F[ $kType ];
 			}
 
 			#W-Bedinung umsetzen=======================
 			if($Type['W']??false) {#Prüft ob für die Ebene ein W Bedinung exsistiert
+				foreach ((array) $F[$kType]['W'] as $kR => $R) {
+					
+						$W .= (($W) ? ' OR (' : " AND ( ");
+						$W_ATT = $W_ID = '';
+						foreach ((array) $R as $kWW => $WW) {
+							if(!($WW['W']??false)) {
+								$WW = (is_array($WW)) ? implode("','", $WW) : $WW;
+								$_kWW = explode('|',$kWW);
+								if (($_kWW[0]??false) == 'ID' ) {
+									$W_ID .= (($W_ID) ? ' AND ' : '') ." dtmp.id IN ('{$WW}') "; # AND (dtmp.path = '{$this->path}' OR dtmp.path = '')
+								}
+								else {
+									$W_ATT .= (($W_ATT) ? ' AND ' : '') . "EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp.id = dt.id AND dtmp.type_id = dt.type_id AND dt.attribute_id IN ('{$_kWW[0]}') AND dt.value IN ('{$WW}') )";
+								}
+							}
+							else { #Unter W-Abfrage z.B: #$D2['PLATFORM']['W'][0]['ARTICLE']['W'][0]['ID'] #$this->PATTERN[$kType]['D'][$kWW]??false && 
+								#ToDo: Flexibler gestalten und recursive!!!
+								if ( isset($WW['W'][0]['ID']) ) {
+									$WW2 = (is_array($WW['W'][0]['ID'])) ? implode("','", $WW['W'][0]['ID']) : $WW['W'][0]['ID']; #Prüfe ob Array übergeben wurde
+									$W_ID = " AND EXISTS (SELECT id FROM wp_data WHERE id IN ('{$WW2}') AND path_hash = dtmp.path_hash ) ";
+								}
+								else {
+									foreach ((array) $WW['W'][0] AS $kWW2 => $vWW2) {
+										$WW2 = (is_array($WW['W'][0][$kWW2])) ? implode("','", $WW['W'][0][$kWW2]) : $WW['W'][0][$kWW2]; #Prüfe ob Array übergeben wurde
+										$W_ID = " AND EXISTS (SELECT 1 FROM wp_data_att dt WHERE dt.value IN ('{$WW2}') AND dt.attribute_id = '{$kWW2}' AND dt.path_hash = dtmp.path_hash ) ";
+									}
+								}
+							}
+						}
+						$W .= ($W_ATT) ? " {$W_ATT} " : '';
+						$W .= ($W_ID) ? " {$W_ID} " : '';
+						$W .= ')';
+					
+				}
+
+				#alt
+				/*
 				foreach ((array) $F[$kType]['W'] as $kR => $R) {
 					$W .= (($W) ? ' OR ' : ' AND ( ') . ' ( ';
 					$W_ATT = '';
@@ -526,10 +579,13 @@ class CData
 				}
 				$W .= ($W) ? ") " : '';
 				$W1 = ($W_ATT)?$W:'';
+				*/
 			}
+			
 			#W================================
 	
-			$W = " (dtmp.type_id = '{$kType}' AND dtmp.parent_path_hash IN ('{$kHash}') {$W_ID} ) {$W1}";
+			#$W = " (dtmp.type_id = '{$kType}' AND dtmp.parent_path_hash IN ('{$kHash}') {$W_ID} ) {$W1}";
+			$W = " (dtmp.type_id = '{$kType}' AND dtmp.parent_path_hash IN ('{$kHash}') ) {$W}";
 			
 			#Todo: Limit muss pro Vater gehen
 			$L = (isset($F[$kType]['L']['STEP'])) ? "LIMIT 0,{$F[$kType]['L']['STEP']}" : $L;
@@ -562,10 +618,17 @@ class CData
 				#$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
 				
 				$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = array_replace_recursive(
-					(array) $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']],
-					(array) json_decode($a['data'], 1)); #recursive weil Daten die an die Funktion übergeben wurden, ebenfalls übernohmen werden müssen
+				(array) $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']],
+				(array) json_decode($a['data'], 1));
+				
 				$d[ $a['path_hash'] ] = &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
 
+				#ForeignKey Anhang
+				foreach((array)$ForeignKeys AS $kFK => $FK) {
+					if($savePatern[$kType][$kFK]['ForeignKey']) {
+						$D[ $a['parent_path_hash'] ][ $a['type_id'] ][ $kFK ]['D'][ $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']][ $kFK ] ][ $a['type_id'] ]['D'][$a['id']] = &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
+					}
+				}
 				#Kind
 				foreach((array)$F[ $a['type_id'] ] AS $kChild => $Child) {
 					$_Hash[ $kChild ][] = $a['path_hash'] ;
@@ -587,7 +650,7 @@ class CData
 			if(($savePatern[$kType]['D']??null) && $_Hash) { #$_Hash=Wenn Parents nicht vorhaden sind, dann gibt es auch keine kinder
 				$stLevel++;
 				$this->PATTERN = $savePatern[$kType]['D']??=[];
-				$this->get_object_reqursive($d,$f,$_Hash);
+				$this->get_object($d,$f,$_Hash);
 				$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
 				$stLevel--;
 			}
