@@ -36,6 +36,7 @@
 	$dd['STORAGE']['L']['STEP'] = 2; // maximal 2 Datensätze ausgeben. Gilt für Storage, kann auch für unteren Knoten angegeben werden
 	$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK']['A']['Stock'] = ['SUM','COUNT','AVG','MIN','MAX']; #Aggregate COUNT,SUM,AVG,MIN,MAX Ermittelt für das Feld Stock. Ist nur für nummerische Werte möglich
 	$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ID'] = ['A1']; #Kann Filter einer höeren Ebene auf die untere Ebene Anwenden. Z.B: wenn ein Supplier gesucht ist, dieser nur Artiekl von ID A1 beinhalte.
+	$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['ID'] = ['ATT1','ATT2']; #Gib alle Supplier diese Artikel mit Attribut-ID ATT1 oder ATT2 beinhalten.
 
 	#Nachschlage Tabelle am besten mit Punkt (optional) als Standard nutzen.
 	$dd['ARTICLE']['ARTICLE.ATTRIBUTE']['D'][ARTICLE_ID.ATTRIBUTE_ID]['Title'] = 'Hallo';
@@ -52,6 +53,8 @@
 ! Fix: WHERE Abfrage überarbeitet, IDs können nun auch in OR Kombinationen unabhängig verwendet werden
 ~ Funktionen get_object_recursive und set_object_recursive in get_object und set_object umbennant.
 + ForeignKey: Beim Pattern kann = 1 übergeben werden. Dadurch kann man ein Feld als Fremdschlüssel kennzeichnen. Bei der Ausgabe wird PARENT->CHILD ausgabe generiert, so dass auch nach Fremdschlüssel selekitert wird.
+~ Where Bedinungn überarbeitet. Die Where Bedinung kann nun Rekursive genutzt werden z.B: $D['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['Value'] = 'test';
+~ Where Oeration IN,NOTIN, LIKE, LIKE%,LIKE%%,LIKE-%,LIKE%-,>,<,<=,<=,<>,!=,= hinzugefügt.
 #2.02
 ! Fix: kleine Fehler behebungen
 ! Fix: get_object hat Daten diese bereits an die Funktion übergeben wurden, verschluckt.
@@ -92,6 +95,8 @@
 ===============================
 
 #ToDo:
+BUG: IN  Tabelle wp_data_att ist womöglich unter der Spalte path_hash Parent hash ID hinterlegt, so muss in  => parent_path_hash umbennant werden!.
+
 #Performance Optimierung:
 ##1. #2 Cache: Speichert komplete Zweige als array in DB anhand des Filters. Wird gelöscht sobald Daten im Zweig sich ändern.
 ##2. #3 Cache: Speichert. Speichert alle Werte anhand Filter für einige Minuten bzw. für fest gelegten Zeitraum, ignoriert dafür jegliche Änderungen am Zweigen.
@@ -479,6 +484,120 @@ class CData
 		
 	}
 
+	/**
+	 * $F = Filer übergabe 
+	 * $Pattern = Pattern übergabe
+	 * $Level = nur 0 oder garnichts übergeben, wird intern verwendet
+	 */
+	private function _get_where(&$F,&$Pattern,$Level=0) {
+		if($F['W']??false) { #Prüft ob es sich um eine Where anweisung sich handelt
+			$W .= ' AND ( ';
+			foreach ((array) $F['W'] as $kOR => $OR) { #OR Bedinungen durchlaufen
+				$WOR .= ($WOR)? ' OR ( ' : '';
+				$WAND = '';
+				foreach( (array) $OR AS $kAND => $AND ) { #AND Bedinungen durchlaufen
+					if($kAND == 'ID') {
+						#$Value = (is_array($AND)) ? implode("','", $AND) : $AND;
+						#$WAND .= (($WAND)? ' AND ' : ' ')." dtmp{$Level}.id IN ('{$Value}') ";
+						$Value = $this->_get_where_Operations($kAND,$AND,$Level);
+						$WAND .= (($WAND)? ' AND ' : ' ')." {$Value} ";
+					}
+					elseif( in_array($kAND,array_keys((array)$Pattern) ) ) { #Prüfe ob das Attribut auch im Patern enthalten ist. z.B: Active
+						#$Value = (is_array($AND)) ? implode("','", $AND) : $AND;
+						#$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND dt.attribute_id IN ('{$kAND}') AND dt.value IN ('{$Value}') )";
+						$Value = $this->_get_where_Operations($kAND, $AND,$Level);
+						$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp{$Level}.parent_path_hash = dt.path_hash AND dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND dt.attribute_id IN ('{$kAND}') AND ({$Value}) )";
+					}
+					elseif( in_array($kAND,array_keys((array)$Pattern['D']) )) {# Weitere Ebene Prüfen
+						$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 2 FROM wp_data_cache dtmp".($Level+1) ." WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash ";
+						$WAND .= $this->_get_where($AND,$Pattern['D'][$kAND],$Level+1);
+						$WAND .= ' ) ';
+					}
+				}
+				$WOR .= ($WOR)?"{$WAND} ) " : $WAND;
+			}
+			$W .= " {$WOR} ) ";
+		}
+		return $W;
+	}
+
+	/**
+	 * Filds = Feld übergabe mit Oeration oder ohne z:B $Filds['ID'] = ['12'] (wird immer IN gewählt wenn kein Operator) Oder $Filds['ID']['IN'] = ['12'] Oder ...['ID']['IN'] = '12' ODER ...['ID']['LIKE%%'] = 'Test' ODER ...['ID']['LIKE%%'] = ['Test', 'Test2']
+	 * Operatoren: IN;NOT IN;LIKE;LIKE%-;LIKE-%;LIKE%%;>;<;<=;<=;=;<>;!=
+	 * $Level Muss von _get_where das Level übergeben werden!
+	 */
+	private function _get_where_Operations ($Fild,$Operation,$Level=0) {
+		
+		$OV = $aloneOV ='';
+		$_Fild = ($Fild == 'ID')?"dtmp{$Level}.id":"dt.value";
+		foreach ((array)$Operation AS $kOpe => $Ope) {
+			$OV .= ($OV)? ' OR ' : '';
+			$_Value = '';
+
+			if( in_array($kOpe, ['LIKE','LIKE%','LIKE%','LIKE%%','LIKE%-','LIKE-%']) ) {
+				$pre = (in_array($kOpe,['LIKE%','LIKE%%','LIKE%-']))?'%':'';
+				$suf = (in_array($kOpe,['LIKE%','LIKE%%','LIKE-%']))?'%':'';
+				if(is_array($Ope)) { #Wurde Value als Array übergeben?
+					foreach((array)$Ope AS $k => $v) {
+						$_Value .= ($_Value?' OR ':'')."{$_Fild} LIKE '{$pre}{$v}{$suf}' ";
+					}
+				}
+				else {
+					$_Value = " {$_Fild} LIKE '{$pre}{$Ope}{$suf}'";
+				}
+				$OV .= " {$_Value} ";
+			}
+			elseif( in_array($kOpe, ['>','<','>=','<=','<>','!=','=']) ) {
+				if(is_array($Ope)) { #Wurde Value als Array übergeben?
+					foreach((array)$Ope AS $k => $v) {
+						$_Value .= ($_Value?' OR ':'')." {$_Fild} {$kOpe} '{$v}' ";
+					}
+				}
+				else {
+					$_Value = "{$_Fild} {$kOpe} '{$Ope}'";
+				}
+				$OV .= " {$_Value} ";
+			}
+			elseif( in_array($kOpe, ['IS NULL','NOT NULL']) ) {
+				#Todo
+			}
+			elseif( in_array($kOpe, ['BETWEEN','NOT BETWEEN']) ) {
+				#Todo
+			}
+			elseif( in_array($kOpe, ['IN']) ) {
+				if(is_array($Ope)) { #Wurde Value als Array übergeben?
+					foreach((array)$Ope AS $k => $v) {
+						$_Value .= ($_Value?',':'')."'{$v}'";
+					}
+				}
+				else {
+					$_Value = "'{$Ope}'";
+				}
+				$OV .= " {$_Fild} IN ({$_Value}) ";
+			}
+			elseif( in_array($kOpe, ['NOTIN', 'NOT IN']) ) {
+				if(is_array($Ope)) { #Wurde Value als Array übergeben?
+					foreach((array)$Ope AS $k => $v) {
+						$_Value .= ($_Value?',':'')."'{$v}'";
+					}
+				}
+				else {
+					$_Value = "'{$Ope}'";
+				}
+				$OV .= " {$_Fild} NOT IN ({$_Value}) ";
+			}
+			else {
+				$aloneOV .= ($aloneOV?',':" {$_Fild} IN (")."'{$Ope}'"; #Ohne Operator übergabe
+			}
+		}
+		if(!$Operation) { #Wenn keine Operation und kein Wert übergeben wurde aber nur ein kFild, dann ist der Value als Leer zu betrachten
+			$aloneOV .= ($aloneOV?',':" {$_Fild} IN (")."'{$Ope}'"; #Ohne Operator übergab 
+		}
+		$O .= ($aloneOV)?$aloneOV.')':'';
+		$O .= "{$OV}";
+	
+	return " {$O} ";
+}
 
 	function get_object(&$D = null, &$F=null, $Parent_Hash=[], $Parent_Type = '', $Parent_Id = '') {
 		static $stLevel = 0;
@@ -507,85 +626,9 @@ class CData
 				$f = $F[ $kType ];
 			}
 
-			#W-Bedinung umsetzen=======================
-			if($Type['W']??false) {#Prüft ob für die Ebene ein W Bedinung exsistiert
-				foreach ((array) $F[$kType]['W'] as $kR => $R) {
-					
-						$W .= (($W) ? ' OR (' : " AND ( ");
-						$W_ATT = $W_ID = '';
-						foreach ((array) $R as $kWW => $WW) {
-							if(!($WW['W']??false)) {
-								$WW = (is_array($WW)) ? implode("','", $WW) : $WW;
-								$_kWW = explode('|',$kWW);
-								if (($_kWW[0]??false) == 'ID' ) {
-									$W_ID .= (($W_ID) ? ' AND ' : '') ." dtmp.id IN ('{$WW}') "; # AND (dtmp.path = '{$this->path}' OR dtmp.path = '')
-								}
-								else {
-									$W_ATT .= (($W_ATT) ? ' AND ' : '') . "EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp.id = dt.id AND dtmp.type_id = dt.type_id AND dt.attribute_id IN ('{$_kWW[0]}') AND dt.value IN ('{$WW}') )";
-								}
-							}
-							else { #Unter W-Abfrage z.B: #$D2['PLATFORM']['W'][0]['ARTICLE']['W'][0]['ID'] #$this->PATTERN[$kType]['D'][$kWW]??false && 
-								#ToDo: Flexibler gestalten und recursive!!!
-								if ( isset($WW['W'][0]['ID']) ) {
-									$WW2 = (is_array($WW['W'][0]['ID'])) ? implode("','", $WW['W'][0]['ID']) : $WW['W'][0]['ID']; #Prüfe ob Array übergeben wurde
-									$W_ID = " AND EXISTS (SELECT id FROM wp_data WHERE id IN ('{$WW2}') AND path_hash = dtmp.path_hash ) ";
-								}
-								else {
-									foreach ((array) $WW['W'][0] AS $kWW2 => $vWW2) {
-										$WW2 = (is_array($WW['W'][0][$kWW2])) ? implode("','", $WW['W'][0][$kWW2]) : $WW['W'][0][$kWW2]; #Prüfe ob Array übergeben wurde
-										$W_ID = " AND EXISTS (SELECT 1 FROM wp_data_att dt WHERE dt.value IN ('{$WW2}') AND dt.attribute_id = '{$kWW2}' AND dt.path_hash = dtmp.path_hash ) ";
-									}
-								}
-							}
-						}
-						$W .= ($W_ATT) ? " {$W_ATT} " : '';
-						$W .= ($W_ID) ? " {$W_ID} " : '';
-						$W .= ')';
-					
-				}
+			$W = $this->_get_where($Type,$savePatern[$kType],0);
 
-				#alt
-				/*
-				foreach ((array) $F[$kType]['W'] as $kR => $R) {
-					$W .= (($W) ? ' OR ' : ' AND ( ') . ' ( ';
-					$W_ATT = '';
-					foreach ((array) $R as $kWW => $WW) {
-						if(!($WW['W']??false)) {
-							$WW = (is_array($WW)) ? implode("','", $WW) : $WW;
-							$_kWW = explode('|',$kWW);
-							if (($_kWW[0]??false) == 'ID' ) {
-								$W_ID = " AND dtmp.id IN ('{$WW}') "; # AND (dtmp.path = '{$this->path}' OR dtmp.path = '')
-							}
-							else {
-								$W_ATT .= (($W_ATT) ? ' AND ' : '') . "EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp.id = dt.id AND dtmp.type_id = dt.type_id AND dt.attribute_id IN ('{$_kWW[0]}') AND dt.value IN ('{$WW}') )";
-							}
-						}
-						else { #Unter W-Abfrage z.B: #$D2['PLATFORM']['W'][0]['ARTICLE']['W'][0]['ID'] #$this->PATTERN[$kType]['D'][$kWW]??false && 
-							#ToDo: Flexibler gestalten und recursive!!!
-							if ( isset($WW['W'][0]['ID']) ) {
-								$WW2 = (is_array($WW['W'][0]['ID'])) ? implode("','", $WW['W'][0]['ID']) : $WW['W'][0]['ID']; #Prüfe ob Array übergeben wurde
-								$W_ID = " AND EXISTS (SELECT id FROM wp_data WHERE id IN ('{$WW2}') AND path_hash = dtmp.path_hash ) ";
-							}
-							else {
-								foreach ((array) $WW['W'][0] AS $kWW2 => $vWW2) {
-									$WW2 = (is_array($WW['W'][0][$kWW2])) ? implode("','", $WW['W'][0][$kWW2]) : $WW['W'][0][$kWW2]; #Prüfe ob Array übergeben wurde
-									$W_ID = " AND EXISTS (SELECT 1 FROM wp_data_att dt WHERE dt.value IN ('{$WW2}') AND dt.attribute_id = '{$kWW2}' AND dt.path_hash = dtmp.path_hash ) ";
-								}
-							}
-						}
-					}
-					$W .= ($W_ATT) ? " {$W_ATT} " : '';
-					$W .= ") ";
-				}
-				$W .= ($W) ? ") " : '';
-				$W1 = ($W_ATT)?$W:'';
-				*/
-			}
-			
-			#W================================
-	
-			#$W = " (dtmp.type_id = '{$kType}' AND dtmp.parent_path_hash IN ('{$kHash}') {$W_ID} ) {$W1}";
-			$W = " (dtmp.type_id = '{$kType}' AND dtmp.parent_path_hash IN ('{$kHash}') ) {$W}";
+			$W = " (dtmp0.type_id = '{$kType}' AND dtmp0.parent_path_hash IN ('{$kHash}') ) {$W}";
 			
 			#Todo: Limit muss pro Vater gehen
 			$L = (isset($F[$kType]['L']['STEP'])) ? "LIMIT 0,{$F[$kType]['L']['STEP']}" : $L;
@@ -598,9 +641,9 @@ class CData
 				foreach ((array) $F[$kType]['O'] as $kR => $R) {
 					foreach ((array) $R as $key => $value) {
 						if ($key == 'ID') {
-							$O .= (($O) ? ',' : '') . " dtmp.id {$value} ";
+							$O .= (($O) ? ',' : '') . " dtmp0.id {$value} ";
 						} else {
-							$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att WHERE dtmp.path_hash = path_hash AND attribute_id = '{$key}' ) {$value}";
+							$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att WHERE dtmp0.path_hash = path_hash AND attribute_id = '{$key}' ) {$value}";
 					
 						}
 					}
@@ -610,10 +653,15 @@ class CData
 
 			#2. Holle Daten
 			$_Hash = null;
+			/*
+			echo "SELECT id, type_id, parent_path_hash,path_hash, data 
+			FROM  wp_data_cache dtmp0
+			WHERE 1
+			AND ({$W}) {$L} {$O}<br>";
+			*/
 			$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data 
-												FROM  wp_data_cache dtmp 
-												WHERE 1
-												AND ({$W}) {$L} {$O}" );
+												FROM  wp_data_cache dtmp0 
+												WHERE {$W} {$L} {$O}" );
 			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
 				#$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
 				
