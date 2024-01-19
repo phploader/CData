@@ -122,13 +122,13 @@ class CData
 			if($P['PRAGMA']??false) {
 				$this->SQL->exec($P['PRAGMA']);
 			} else {
-				$this->SQL->exec('
+				$this->SQL->exec("
 				PRAGMA busy_timeout = 5000;		PRAGMA cache_size = -2000;
 				PRAGMA synchronous = 1;			PRAGMA foreign_keys = ON;
 				PRAGMA temp_store = MEMORY;		PRAGMA default_temp_store = MEMORY;
 				PRAGMA read_uncommitted = true;	PRAGMA journal_mode = wal;
-				PRAGMA wal_autocheckpoint=1000;
-				');
+				PRAGMA wal_autocheckpoint=1000; PRAGMA encoding = 'UTF-8'; 
+				");
 			}
 		} else { exit('kein DB-Übergabe Parameter!'); }
 
@@ -630,7 +630,7 @@ class CData
 
 			$W = " (dtmp0.type_id = '{$kType}' AND dtmp0.parent_path_hash IN ('{$kHash}') ) {$W}";
 			
-			#Todo: Limit muss pro Vater gehen
+			
 			$L = (isset($F[$kType]['L']['STEP'])) ? "LIMIT 0,{$F[$kType]['L']['STEP']}" : $L;
 			$L = (isset($F[$kType]['L']['START']) && $F[$kType]['L']['STEP']) ? "LIMIT {$F[$kType]['L']['START']},{$F[$kType]['L']['STEP']}" : $L;
 
@@ -657,11 +657,11 @@ class CData
 			echo "SELECT id, type_id, parent_path_hash,path_hash, data 
 			FROM  wp_data_cache dtmp0
 			WHERE 1
-			AND ({$W}) {$L} {$O}<br>";
+			AND ({$W}) {$O} {$L}<br>";
 			*/
 			$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data 
 												FROM  wp_data_cache dtmp0 
-												WHERE {$W} {$L} {$O}" );
+												WHERE {$W} {$O} {$L}" );
 			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
 				#$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
 				
