@@ -49,6 +49,8 @@
 
 ===============================
 ##Changelog:
+#2.04
++ Cache Level2 - Klasse für den Cache erstellt. Dadurch können SQL Abfragen komplett gecacht werden. Umgesetzt z.Z. bei Count auswertung. Cache Klasse und dessen Methoden können auch außerhal dieser Klasse in Projekten genutzt werden.
 #2.03
 ! Fix: WHERE Abfrage überarbeitet, IDs können nun auch in OR Kombinationen unabhängig verwendet werden
 ~ Funktionen get_object_recursive und set_object_recursive in get_object und set_object umbennant.
@@ -98,14 +100,14 @@
 BUG: IN  Tabelle wp_data_att ist womöglich unter der Spalte path_hash Parent hash ID hinterlegt, so muss in  => parent_path_hash umbennant werden!.
 
 #Performance Optimierung:
-##1. #2 Cache: Speichert komplete Zweige als array in DB anhand des Filters. Wird gelöscht sobald Daten im Zweig sich ändern.
+##1. #~2 Cache: Speichert komplete Zweige als array in DB anhand des Filters. Wird gelöscht sobald Daten im Zweig sich ändern.
 ##2. #3 Cache: Speichert. Speichert alle Werte anhand Filter für einige Minuten bzw. für fest gelegten Zeitraum, ignoriert dafür jegliche Änderungen am Zweigen.
-##3. # Pfad als Haswert (hash("crc32b", $str)) => path_hash speichern in jeder Tabelle. Dadurch ist die doppelte Bennenung von Typ_id 
-		und id in unterschiedlichen Pfaden dann möglich.
-		- Eine Verknüpfung der Pfade muss dann ermöglicht werden.
+## Tabelle wp_data_child wird womöglich nicht mehr gerbraucht, wenn Count Abfragen durch Cache gespeichert werden.
 */
 class CData
 {
+	private $SQL;
+	private $CCache;
 	/**
 	 * 'PATTERN'	=> Pattern
 	 * 'DB'			=> [FILENAME,FLAGS] Datenbank Zugang
@@ -115,6 +117,7 @@ class CData
 		if($P['DB']) {
 			if(file_exists($P['DB']['FILENAME'])) {
 				$this->SQL = new SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
+				$this->CCache = new CCache([ 'DB' => ['FILENAME' => $P['DB']['FILENAME'].'.cache' ] ]);
 			} else {
 				$this->SQL = new SQLite3($P['DB']['FILENAME']);
 				$this->CreateDB();
@@ -137,7 +140,7 @@ class CData
 		
 	}
 
-	function CreateDB() {
+	private function CreateDB() {
 		$this->SQL->exec('
 			CREATE TABLE IF NOT EXISTS "wp_data" (
 			"id" text NOT NULL,
@@ -659,9 +662,7 @@ class CData
 			WHERE 1
 			AND ({$W}) {$O} {$L}<br>";
 			*/
-			$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data 
-												FROM  wp_data_cache dtmp0 
-												WHERE {$W} {$O} {$L}" );
+			$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}");
 			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
 				#$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
 				
@@ -682,8 +683,40 @@ class CData
 					$_Hash[ $kChild ][] = $a['path_hash'] ;
 				}
 			}
-	
+			/*
+			$_cache_md5 = md5("SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}");
+			$_cache[ $_cache_md5 ] = [
+				'Source' => "SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}",
+				'Data' => serialize($D),
+			];
+			$this->CCache->set_cache($_cache);
+*/
+			#2. Lese Counts
+			$_c = null;
+			$sql = "SELECT count(*) num, type_id, parent_path_hash, path_hash FROM wp_data_cache dtmp0 WHERE {$W}";
+			$_sqlmd5 = md5($sql);
+			$_data = $this->CCache->get_cache($_sqlmd5); #Prüfe ob Werte aus dem Cache entnohmen werden könen.
+			if($_data[$_sqlmd5]) {
+				$D = array_merge_recursive($D,unserialize($_data[$_sqlmd5]['Data']));
+			} else {
+				$qry = $this->SQL->query($sql);
+				while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+					$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['COUNT'] = $a['num'];
+					$_c[ $a['parent_path_hash'] ][ $a['type_id'] ]['COUNT'] = $a['num'];
+				}
+				#Cache
+				$_cache[ $_sqlmd5 ] = [
+					'Source'	=> $sql,
+					'Tag'		=> "{$a['parent_path_hash']}/{$a['path_hash']}",
+					'Data'		=> serialize($_c),
+				];
+				$this->CCache->set_cache($_cache);
+			}
+			
+			
+
 			#Lese Count aus
+			/*
 			$kCilds = implode("','", (array)array_keys((array)$D));
 			$qry = $this->SQL->query("SELECT dtc.id, dtc.type_id, child_type_id, child_count, child_path_hash
 											FROM wp_data_child dtc
@@ -693,6 +726,7 @@ class CData
 			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
 				$D[ $a['child_path_hash'] ][ $a['child_type_id'] ]['COUNT'] = $a['child_count'];
 			}
+			*/
 
 			#3. gehe in die weitere Ebene
 			if(($savePatern[$kType]['D']??null) && $_Hash) { #$_Hash=Wenn Parents nicht vorhaden sind, dann gibt es auch keine kinder
@@ -711,4 +745,87 @@ class CData
 
 	}
 
+}
+
+class CCache
+{
+	private $SQL;
+	/**
+	 * 'DB'			=> [FILENAME,FLAGS] Datenbank Zugang
+	 * ToDo: 
+	 * 1. alte ungenutzte Datensätze wieder löschen
+	 * 2. TTL um 24 h verlängern wenn der wert abgefragt wird
+	 * 3. Cache bereinigen wenn Datensätze sich geändert haben, anhand der tag Werte sollen entweder Werte entfernt werden oder durch Source der Cache aktuallisiert werden!
+	 * 
+	*/
+	function __construct($P=null)
+	{
+		if($P['DB']) {
+			if(file_exists($P['DB']['FILENAME'])) {
+				$this->SQL = new SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
+			} else {
+				$this->SQL = new SQLite3($P['DB']['FILENAME']);
+				$this->CreateDB();
+			}
+			if($P['PRAGMA']??false) {
+				$this->SQL->exec($P['PRAGMA']);
+			} else {
+				$this->SQL->exec("
+				PRAGMA busy_timeout = 5000;		PRAGMA cache_size = -2000;
+				PRAGMA synchronous = OFF;		PRAGMA foreign_keys = ON;
+				PRAGMA temp_store = MEMORY;		PRAGMA default_temp_store = MEMORY;
+				PRAGMA read_uncommitted = true;	PRAGMA journal_mode = wal;
+				");
+			}
+		} else { exit('kein DB-Übergabe Parameter!'); }
+	}
+
+	private function CreateDB() {
+		$this->SQL->exec('
+			CREATE TABLE IF NOT EXISTS "wp_cache" (
+			"id" text NOT NULL,
+			"source" text NULL,
+			"ttl" integer NOT NULL,
+			"tag" text NULL,
+			"data" blob NULL,
+			"itimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
+			PRIMARY KEY ("id")
+			);
+			
+			CREATE INDEX IF NOT EXISTS "wp_cache_id" ON "wp_cache" ("id");
+			CREATE INDEX IF NOT EXISTS "wp_cache_tag" ON "wp_cache" ("tag");
+			CREATE INDEX IF NOT EXISTS "wp_cache_ttl" ON "wp_cache" ("ttl");
+			CREATE INDEX IF NOT EXISTS "wp_cache_itimestamp" ON "wp_cache" ("itimestamp");
+			');
+	}
+
+	/*
+	* $P = optional array = [ 'Id', 'Tag' (string|array) (zusätzliche angabe von tag zum gruppieren von Caches) ]
+	*/
+	function get_cache($id) {
+		$_id = (is_array($id))?implode("','",(array)$id):$id;
+		$W = " id IN ('{$_id}')";
+		$qry = $this->SQL->query("SELECT id AS Id, source AS Source, ttl AS Ttl, tag AS Tag, data AS Data FROM  wp_cache WHERE {$W}" );
+		$now = time()-(24*60*60);
+		while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+			$D[$a['Id']] = ($a['Ttl'] > $now)?$a:false; #Bei veralteten Wert, wird false zugewiesen, dadurch sollte set_cache ausgeführt werden und erfrischt werden
+		}
+		return $D;
+	}
+
+	/*
+	* $P[ID] = optional array = [ 'Tag', 'Source', 'Ttl']
+	*/
+	function set_cache($P) {
+		$stmt = $this->SQL->prepare('REPLACE INTO wp_cache (id, ttl, source, tag, data) VALUES (:id, :ttl, :source, :tag, :data)');
+		foreach((array)$P AS $kP => $vP){
+			$vP['Ttl'] = ($vP['Ttl'])?",'{$vP['Ttl']}'":time()+24*60*60;
+			$stmt->bindParam(':id', $kP);
+			$stmt->bindParam(':ttl', $vP['Ttl'], \SQLITE3_INTEGER );
+			$stmt->bindParam(':source', $vP['Source']);
+			$stmt->bindParam(':tag', $vP['Tag']);
+			$stmt->bindParam(':data', $vP['Data'], SQLITE3_BLOB);
+		}
+		return $stmt->execute() !== false;
+	}
 }
