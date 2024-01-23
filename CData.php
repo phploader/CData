@@ -17,7 +17,7 @@
 	];
 	$d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S1'] = [
 		'Active'	=> 0,
-		'Title' => 'StorageA',
+		'Title' => 'StorageA', //Wird '' oder NULL übergeben, so wird das Attribut gelöscht. Nur nicht bei Type=ForeignKey Da werden auch leere Felder übergeben und nur bei NULL gelöscht
 	];
 	$d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2'] = [
 		'Active'	=> 0,
@@ -50,7 +50,7 @@
 ===============================
 ##Changelog:
 #2.04
-+ Cache Level2 - Klasse für den Cache erstellt. Dadurch können SQL Abfragen komplett gecacht werden. Umgesetzt z.Z. bei Count auswertung. Cache Klasse und dessen Methoden können auch außerhal dieser Klasse in Projekten genutzt werden.
++ Cache Level2 - Klasse für den Cache erstellt. Dadurch werden alle Abfragen an get_object gechacht und durch set_oject wird dieser bereinigt
 #2.03
 ! Fix: WHERE Abfrage überarbeitet, IDs können nun auch in OR Kombinationen unabhängig verwendet werden
 ~ Funktionen get_object_recursive und set_object_recursive in get_object und set_object umbennant.
@@ -137,7 +137,6 @@ class CData
 
 		$this->PATTERN = $P['PATTERN'];
 		$this->refreshCacheObjeckt = [];
-		
 	}
 
 	private function CreateDB() {
@@ -330,6 +329,7 @@ class CData
 			
 			if (($this->PATTERN[$kType]??false) && is_array($Type)) { #Prüfe in Pattern ob diese erlaubt sind
 				
+				$this->CCache->flush(['Tag' => "{$kType}/"]); #Cache bereinigen #ToDo: prüfen ob in der ebene veräderungen vorgenohmen wurden und nicht einfach pauschal leeren.
 				
 				foreach ((array) $Type['D'] AS $kSup => $Sup) { #PlATFORM.D[x]
 				
@@ -339,8 +339,6 @@ class CData
 					if(($Sup['Active']??false) != -2 ) { #Insert/ Update
 
 						$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$Parent_Type}','{$Parent_Id}')";
-						
-						
 						
 						
 						foreach ((array) $Sup as $kATT => $ATT) { #PlATFORM.D.x.[ATTRIBUTE]
@@ -357,7 +355,7 @@ class CData
 									$stLevel--;
 								}
 								elseif($this->PATTERN[$kType][$kATT]??false) {
-									if($ATT != '') {
+									if($ATT != '' || ($ATT !== NULL && $this->PATTERN[$kType][$kATT]['ForeignKey'] == 1) ) {
 										$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$kATT}'";#Setze Attribute
 										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->_Value2SortHash($ATT)."'" : ",NULL";
 										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->SQL->escapeString($ATT)."'" : ",NULL";
@@ -434,7 +432,7 @@ class CData
 			#1. Lösche alte Datensätze anhand des PathHash
 			$Keys = implode("','",array_keys($RefrechCache_PathHash));
 			$this->SQL->query("DELETE FROM wp_data_cache WHERE parent_path_hash IN ('{$Keys}')");
-			$this->SQL->query("DELETE FROM wp_data_child WHERE child_path_hash IN ('{$Keys}')");
+			##$this->SQL->query("DELETE FROM wp_data_child WHERE child_path_hash IN ('{$Keys}')");
 			
 			#2. Selektiere Datensätze anhand des PathHash
 			/*
@@ -478,11 +476,13 @@ class CData
 									
 			}
 			#4. Aktuallisiere data_child Counts
+			/*
 			$this->SQL->query("REPLACE INTO wp_data_child (id, type_id, child_path_hash, child_type_id, child_count) 
 									SELECT parent_data_id, parent_type_id, path_hash, type_id, count(*) FROM wp_data
 									WHERE path_hash IN ('{$Keys}')
 									GROUP BY parent_data_id,path_hash,type_id
 									");
+			*/
 		}
 		
 	}
@@ -562,7 +562,16 @@ class CData
 				$OV .= " {$_Value} ";
 			}
 			elseif( in_array($kOpe, ['IS NULL','NOT NULL']) ) {
-				#Todo
+				#Todo: Es werden keine Attribute mit NULL angelegt, daher muss bereits NOT EXISTS geprüft werden
+				if(is_array($Ope)) { #Wurde Value als Array übergeben?
+					foreach((array)$Ope AS $k => $v) {
+						$_Value .= ($_Value?' OR ':'')." {$_Fild} {$kOpe} ";
+					}
+				}
+				else {
+					$_Value = "{$_Fild} {$kOpe} ";
+				}
+				$OV .= " {$_Value} ";
 			}
 			elseif( in_array($kOpe, ['BETWEEN','NOT BETWEEN']) ) {
 				#Todo
@@ -606,141 +615,168 @@ class CData
 		static $stLevel = 0;
 		
 		$D = ($stLevel==0)?['' => $D]:$D;
+		if($stLevel==0) {
+			##$saveD = $D;
+			##$D == null;
+
+			##$_sqlmd5 = md5(serialize($F));
+			#echo "{$_sqlmd5}<br>";
+			##$_CacheData = $this->CCache->get_cache($_sqlmd5);
+			#echo md5(serialize($F)).'<br>';
+		}
 		
-		$savePatern = $this->PATTERN;
+		
 
-		foreach((array)$F AS $kType => $Type) {
-			$W1 = $W = $L = $W_ID = '';
-			#1. Erstelle Bedinung
-			
-			$kHash = ($Parent_Hash)?implode("','",(array)$Parent_Hash[$kType]):"";
-			
-			
-			#Durlaufe alle Felder um Informationen dazu zu erhalten, wei z.B: Type, ForeignKey
-			foreach((array) $savePatern[$kType] AS $kPF => $PF) {
-				#Filtere ForeignKey Felder heraus
-				if ($PF['ForeignKey']) {#Ist Fremdschlüssel?
-					$ForeignKeys[$kPF] = $PF['ForeignKey'];
+		
+			$savePatern = $this->PATTERN;
+
+			foreach((array)$F AS $kType => $Type) {
+				#0 Cache Abfrage
+				if($stLevel==0) {
+					$_sqlmd5 = md5(serialize([$kType => $F[$kType] ]));
+					$_CacheData = $this->CCache->get_cache($_sqlmd5);
 				}
-			}
-			
+				if($_CacheData) {
+					#$D[''] = unserialize($_CacheData[$_sqlmd5]['Data']);
+					$d = unserialize($_CacheData[$_sqlmd5]['Data']);
+					$D[''] = array_replace((array)$D[''],(array)$d);
+				}
+				else {
 
-			if($savePatern[$kType]['D']??null) { #Pürft ob weitere Ebene Vorhanden ist
-				$f = $F[ $kType ];
-			}
-
-			$W = $this->_get_where($Type,$savePatern[$kType],0);
-
-			$W = " (dtmp0.type_id = '{$kType}' AND dtmp0.parent_path_hash IN ('{$kHash}') ) {$W}";
-			
-			
-			$L = (isset($F[$kType]['L']['STEP'])) ? "LIMIT 0,{$F[$kType]['L']['STEP']}" : $L;
-			$L = (isset($F[$kType]['L']['START']) && $F[$kType]['L']['STEP']) ? "LIMIT {$F[$kType]['L']['START']},{$F[$kType]['L']['STEP']}" : $L;
-
-			#Order By
-			$O = '';
-			if ($Type['O']??false) {
-				
-				foreach ((array) $F[$kType]['O'] as $kR => $R) {
-					foreach ((array) $R as $key => $value) {
-						if ($key == 'ID') {
-							$O .= (($O) ? ',' : '') . " dtmp0.id {$value} ";
-						} else {
-							$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att WHERE dtmp0.path_hash = path_hash AND attribute_id = '{$key}' ) {$value}";
+					$W1 = $W = $L = $W_ID = '';
+					#1. Erstelle Bedinung
+					$kHash = ($Parent_Hash)?implode("','",(array)$Parent_Hash[$kType]):"";
 					
+					
+					#Durlaufe alle Felder um Informationen dazu zu erhalten, wei z.B: Type, ForeignKey
+					foreach((array) $savePatern[$kType] AS $kPF => $PF) {
+						#Filtere ForeignKey Felder heraus
+						if ($PF['ForeignKey']) {#Ist Fremdschlüssel?
+							$ForeignKeys[$kPF] = $PF['ForeignKey'];
 						}
 					}
-				}
-				$O = ($O) ? "ORDER BY {$O}" : '';
-			}
+					
 
-			#2. Holle Daten
-			$_Hash = null;
-			/*
-			echo "SELECT id, type_id, parent_path_hash,path_hash, data 
-			FROM  wp_data_cache dtmp0
-			WHERE 1
-			AND ({$W}) {$O} {$L}<br>";
-			*/
-			$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}");
-			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-				#$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
-				
-				$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = array_replace_recursive(
-				(array) $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']],
-				(array) json_decode($a['data'], 1));
-				
-				$d[ $a['path_hash'] ] = &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
+					if($savePatern[$kType]['D']??null) { #Pürft ob weitere Ebene Vorhanden ist
+						$f = $F[ $kType ];
+					}
 
-				#ForeignKey Anhang
-				foreach((array)$ForeignKeys AS $kFK => $FK) {
-					if($savePatern[$kType][$kFK]['ForeignKey']) {
-						$D[ $a['parent_path_hash'] ][ $a['type_id'] ][ $kFK ]['D'][ $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']][ $kFK ] ][ $a['type_id'] ]['D'][$a['id']] = &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
+					$W = $this->_get_where($Type,$savePatern[$kType],0);
+
+					$W = " (dtmp0.type_id = '{$kType}' AND dtmp0.parent_path_hash IN ('{$kHash}') ) {$W}";
+					
+					
+					$L = (isset($F[$kType]['L']['STEP'])) ? "LIMIT 0,{$F[$kType]['L']['STEP']}" : $L;
+					$L = (isset($F[$kType]['L']['START']) && $F[$kType]['L']['STEP']) ? "LIMIT {$F[$kType]['L']['START']},{$F[$kType]['L']['STEP']}" : $L;
+
+					#Order By
+					$O = '';
+					if ($Type['O']??false) {
+						
+						foreach ((array) $F[$kType]['O'] as $kR => $R) {
+							foreach ((array) $R as $key => $value) {
+								if ($key == 'ID') {
+									$O .= (($O) ? ',' : '') . " dtmp0.id {$value} ";
+								} else {
+									$O .= (($O) ? ',' : '') . " (SELECT value FROM wp_data_att WHERE dtmp0.parent_path_hash = path_hash AND attribute_id = '{$key}' ) {$value}";
+							
+								}
+							}
+						}
+						$O = ($O) ? "ORDER BY {$O}" : '';
+					}
+
+					#2. Holle Daten
+					$_Hash = null;
+					
+					##echo "SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}<br>";
+					
+					$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}");
+					while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+						#$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
+						
+						$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][ $a['id'] ] = array_replace_recursive(
+						(array) $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']],
+						(array) json_decode($a['data'], 1));
+						
+						$d[ $a['path_hash'] ] = &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
+
+						#ForeignKey Anhang
+						foreach((array)$ForeignKeys AS $kFK => $FK) {
+							if($savePatern[$kType][$kFK]['ForeignKey']) {
+								$D[ $a['parent_path_hash'] ][ $a['type_id'] ][ $kFK ]['D'][ $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']][ $kFK ] ][ $a['type_id'] ]['D'][$a['id']] 
+								= &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
+							}
+						}
+						#Kind
+						foreach((array)$F[ $a['type_id'] ] AS $kChild => $Child) {
+							$_Hash[ $kChild ][] = $a['path_hash'];
+						}
+					}
+					
+
+					#Lese Count aus
+					$qry = $this->SQL->query("SELECT count(*) num, type_id, parent_path_hash, path_hash FROM wp_data_cache dtmp0 WHERE {$W}");
+					while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+						$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['COUNT'] = $a['num'];
+					}
+					
+					
+					
+
+					#Lese Count aus
+					/*
+					$kCilds = implode("','", (array)array_keys((array)$D));
+					$qry = $this->SQL->query("SELECT dtc.id, dtc.type_id, child_type_id, child_count, child_path_hash
+													FROM wp_data_child dtc
+													WHERE child_type_id = '{$kType}' 
+													AND dtc.child_path_hash IN ('{$kCilds}')
+												");#AND EXISTS (SELECT 1 FROM wp_data_cache dtmp WHERE dtc.child_path_hash = dtmp.parent_path_hash AND ({$W}) )
+					while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+						$D[ $a['child_path_hash'] ][ $a['child_type_id'] ]['COUNT'] = $a['child_count'];
+					}
+					*/
+
+					#3. gehe in die weitere Ebene
+					if(($savePatern[$kType]['D']??null) && $_Hash) { #$_Hash=Wenn Parents nicht vorhaden sind, dann gibt es auch keine kinder
+						$stLevel++;
+						$this->PATTERN = $savePatern[$kType]['D']??=[];
+						$this->get_object($d,$f,$_Hash);
+						$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
+						$stLevel--;
+					}
+
+					if($stLevel == 0) {
+						##$_sqlmd5 = md5(serialize($Type));
+						
+						$_cache[ $_sqlmd5 ] = [
+							'Source'	=> serialize([$kType => $F[$kType] ]),
+							'Tag'		=> $kType.'/'.implode('/',array_keys( $F[$kType])),
+							'Data'		=> serialize($D['']),
+						];
+						$this->CCache->set_cache($_cache);
 					}
 				}
-				#Kind
-				foreach((array)$F[ $a['type_id'] ] AS $kChild => $Child) {
-					$_Hash[ $kChild ][] = $a['path_hash'] ;
-				}
-			}
-			/*
-			$_cache_md5 = md5("SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}");
-			$_cache[ $_cache_md5 ] = [
-				'Source' => "SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}",
-				'Data' => serialize($D),
-			];
-			$this->CCache->set_cache($_cache);
-*/
-			#2. Lese Counts
-			$_c = null;
-			$sql = "SELECT count(*) num, type_id, parent_path_hash, path_hash FROM wp_data_cache dtmp0 WHERE {$W}";
-			$_sqlmd5 = md5($sql);
-			$_data = $this->CCache->get_cache($_sqlmd5); #Prüfe ob Werte aus dem Cache entnohmen werden könen.
-			if($_data[$_sqlmd5]) {
-				$D = array_merge_recursive($D,unserialize($_data[$_sqlmd5]['Data']));
-			} else {
-				$qry = $this->SQL->query($sql);
-				while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-					$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['COUNT'] = $a['num'];
-					$_c[ $a['parent_path_hash'] ][ $a['type_id'] ]['COUNT'] = $a['num'];
-				}
-				#Cache
-				$_cache[ $_sqlmd5 ] = [
-					'Source'	=> $sql,
-					'Tag'		=> "{$a['parent_path_hash']}/{$a['path_hash']}",
-					'Data'		=> serialize($_c),
-				];
-				$this->CCache->set_cache($_cache);
+					
 			}
 			
-			
 
-			#Lese Count aus
-			/*
-			$kCilds = implode("','", (array)array_keys((array)$D));
-			$qry = $this->SQL->query("SELECT dtc.id, dtc.type_id, child_type_id, child_count, child_path_hash
-											FROM wp_data_child dtc
-											WHERE child_type_id = '{$kType}' 
-											AND dtc.child_path_hash IN ('{$kCilds}')
-										");#AND EXISTS (SELECT 1 FROM wp_data_cache dtmp WHERE dtc.child_path_hash = dtmp.parent_path_hash AND ({$W}) )
-			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-				$D[ $a['child_path_hash'] ][ $a['child_type_id'] ]['COUNT'] = $a['child_count'];
-			}
-			*/
-
-			#3. gehe in die weitere Ebene
-			if(($savePatern[$kType]['D']??null) && $_Hash) { #$_Hash=Wenn Parents nicht vorhaden sind, dann gibt es auch keine kinder
-				$stLevel++;
-				$this->PATTERN = $savePatern[$kType]['D']??=[];
-				$this->get_object($d,$f,$_Hash);
-				$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
-				$stLevel--;
-			}
-				
-		}
-
+		
 		if($stLevel == 0) {
 			$D = $D[ '' ];
+			/*
+			if(!$_CacheData) {
+				$_cache[ $_sqlmd5 ] = [
+					'Source'	=> serialize($F),
+					'Tag'		=> "{$a['parent_path_hash']}/{$a['path_hash']}",
+					'Data'		=> serialize($D['']),
+				];
+				$this->CCache->set_cache($_cache);
+			} else {
+				$dd = unserialize($_CacheData[$_sqlmd5]['Data']);
+			}
+			*/
+			##$D = array_replace((array)$saveD,(array)$D['']);
 		}
 
 	}
@@ -826,6 +862,15 @@ class CCache
 			$stmt->bindParam(':tag', $vP['Tag']);
 			$stmt->bindParam(':data', $vP['Data'], SQLITE3_BLOB);
 		}
-		return $stmt->execute() !== false;
+	###	return $stmt->execute() !== false;
+	}
+
+	/* Cache bereinigen */
+	function flush($P) {
+		if($P['Tag']) {
+			$this->SQL->query("DELETE FROM wp_cache WHERE tag LIKE '{$P['Tag']}%' ");
+		}
+		$time = time()-24*60*60;
+		$this->SQL->query("DELETE FROM wp_cache WHERE itimestamp < {$time} ");
 	}
 }
