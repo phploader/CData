@@ -51,6 +51,7 @@
 ##Changelog:
 #2.04
 + Cache Level2 - Klasse für den Cache erstellt. Dadurch werden alle Abfragen an get_object gechacht und durch set_oject wird dieser bereinigt
+! Fix: Wenn ein Zweig gelöscht wird, wurden die Attribute unter wp_data_att nicht mit gelöscht.
 #2.03
 ! Fix: WHERE Abfrage überarbeitet, IDs können nun auch in OR Kombinationen unabhängig verwendet werden
 ~ Funktionen get_object_recursive und set_object_recursive in get_object und set_object umbennant.
@@ -372,7 +373,8 @@ class CData
 						
 					}
 					else { #Delete
-						$D_DATA .= (($D_DATA) ? ' OR ' : '') . " (id = '{$kSup}' AND type_id = '{$kType}' AND parent_type_id = '{$Parent_Type}' AND parent_data_id = '{$Parent_Id}')"; 
+						$D_DATA .= (($D_DATA) ? ' OR ' : '') . " (id = '{$kSup}' AND type_id = '{$kType}' AND parent_type_id = '{$Parent_Type}' AND parent_data_id = '{$Parent_Id}' AND path_hash = '{$Parent_Hash}')";
+						$D_DATA_ATT .= (($D_DATA_ATT) ? ' OR ' : '') ." (id = '{$kSup}' AND type_id = '{$kType}' AND path_hash = '{$Parent_Hash}' )"; #lösche alle Attribute
 					}
 				}
 			}
