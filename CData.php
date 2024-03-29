@@ -434,14 +434,8 @@ class CData
 			#1. Lösche alte Datensätze anhand des PathHash
 			$Keys = implode("','",array_keys($RefrechCache_PathHash));
 			$this->SQL->query("DELETE FROM wp_data_cache WHERE parent_path_hash IN ('{$Keys}')");
-			##$this->SQL->query("DELETE FROM wp_data_child WHERE child_path_hash IN ('{$Keys}')");
 			
 			#2. Selektiere Datensätze anhand des PathHash
-			/*
-			$qry = $this->SQL->query("SELECT id, type_id, path_hash, attribute_id, value
-										FROM wp_data_att dat
-										WHERE path_hash IN ('{$Keys}')
-			");*/
 			$qry = $this->SQL->query("SELECT d.id, d.type_id, d.path_hash, attribute_id, value
 						FROM wp_data d LEFT JOIN wp_data_att dat ON d.id = dat.id AND d.type_id = dat.type_id AND d.path_hash = dat.path_hash
 						WHERE d.path_hash IN ('{$Keys}')
@@ -616,20 +610,10 @@ class CData
 	function get_object(&$D = null, &$F=null, $Parent_Hash=[], $Parent_Type = '', $Parent_Id = '') {
 		static $stLevel = 0;
 		
-		##$D = ($stLevel==0)?['' => $D]:$D;
 		if($stLevel==0) {
 			$saveD = $D;
 			$D = null;
-
-			##$_sqlmd5 = md5(serialize($F));
-			#echo "{$_sqlmd5}<br>";
-			##$_CacheData = $this->CCache->get_cache($_sqlmd5);
-			#echo md5(serialize($F)).'<br>';
 		}
-		
-		
-		
-
 		
 			$savePatern = $this->PATTERN;
 
@@ -640,15 +624,10 @@ class CData
 					$_CacheData = $this->CCache->get_cache($_sqlmd5);
 				}
 				if($stLevel==0 && isset($_CacheData[$_sqlmd5])) {
-					##echo "Cache Laden<br>";
-					#$D[''] = unserialize($_CacheData[$_sqlmd5]['Data']);
 					$d = unserialize($_CacheData[$_sqlmd5]['Data']);
-					##$D[''] = array_replace((array)$D[''],(array)$d);
-					#print_r($d);echo "<br>";
 					$D[''][$kType] = $d[$kType];
 				}
 				else {
-					#echo "$kType<br>";
 					$W1 = $W = $L = $W_ID = '';
 					#1. Erstelle Bedinung
 					$kHash = ($Parent_Hash)?implode("','",(array)$Parent_Hash[$kType]):"";
@@ -699,8 +678,6 @@ class CData
 					
 					$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}");
 					while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-						#$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
-						
 						$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][ $a['id'] ] = array_replace_recursive(
 						(array) ($D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']]??[]),
 						(array) json_decode($a['data'], 1));
@@ -727,22 +704,6 @@ class CData
 						$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['COUNT'] = $a['num'];
 					}
 					
-					
-					
-
-					#Lese Count aus
-					/*
-					$kCilds = implode("','", (array)array_keys((array)$D));
-					$qry = $this->SQL->query("SELECT dtc.id, dtc.type_id, child_type_id, child_count, child_path_hash
-													FROM wp_data_child dtc
-													WHERE child_type_id = '{$kType}' 
-													AND dtc.child_path_hash IN ('{$kCilds}')
-												");#AND EXISTS (SELECT 1 FROM wp_data_cache dtmp WHERE dtc.child_path_hash = dtmp.parent_path_hash AND ({$W}) )
-					while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-						$D[ $a['child_path_hash'] ][ $a['child_type_id'] ]['COUNT'] = $a['child_count'];
-					}
-					*/
-
 					#3. gehe in die weitere Ebene
 					if(($savePatern[$kType]['D']??null) && $_Hash) { #$_Hash=Wenn Parents nicht vorhaden sind, dann gibt es auch keine kinder
 						$stLevel++;
@@ -753,14 +714,11 @@ class CData
 					}
 
 					if($stLevel == 0) {
-						##$_sqlmd5 = md5(serialize($Type));
-						
 						$_cache[ $_sqlmd5 ] = [
 							'Source'	=> serialize([$kType => $F[$kType] ]),
 							'Tag'		=> $kType.'/'.implode('/',array_keys( $F[$kType])),
 							'Data'		=> serialize([$kType =>  $D[''][$kType]] ), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
 						];
-						#print_r($_cache);
 						$this->CCache->set_cache($_cache);
 					}
 				}
@@ -770,20 +728,6 @@ class CData
 
 		
 		if($stLevel == 0) {
-			#$D = $D[ '' ];
-			/*
-			if(!$_CacheData) {
-				$_cache[ $_sqlmd5 ] = [
-					'Source'	=> serialize($F),
-					'Tag'		=> "{$a['parent_path_hash']}/{$a['path_hash']}",
-					'Data'		=> serialize($D['']),
-				];
-				$this->CCache->set_cache($_cache);
-			} else {
-				$dd = unserialize($_CacheData[$_sqlmd5]['Data']);
-			}
-			*/
-			
 			$D = array_replace_recursive((array)$saveD,(array)$D['']);
 		}
 
