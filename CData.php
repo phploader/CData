@@ -523,7 +523,7 @@ class CData
 			}
 			$W .= " {$WOR} ) ";
 		}
-		return $W;
+		return $W??'';
 	}
 
 	/**
@@ -638,7 +638,7 @@ class CData
 					$_sqlmd5 = md5(serialize([$kType => $F[$kType] ]));
 					$_CacheData = $this->CCache->get_cache($_sqlmd5);
 				}
-				if($_CacheData) {
+				if($stLevel==0 && isset($_CacheData[$_sqlmd5]) ) {
 					#$D[''] = unserialize($_CacheData[$_sqlmd5]['Data']);
 					$d = unserialize($_CacheData[$_sqlmd5]['Data']);
 					$D[''] = array_replace((array)$D[''],(array)$d);
@@ -651,9 +651,9 @@ class CData
 					
 					
 					#Durlaufe alle Felder um Informationen dazu zu erhalten, wei z.B: Type, ForeignKey
-					foreach((array) $savePatern[$kType] AS $kPF => $PF) {
+					foreach((array) ($savePatern[$kType]??[]) AS $kPF => $PF) {
 						#Filtere ForeignKey Felder heraus
-						if ($PF['ForeignKey']) {#Ist Fremdschlüssel?
+						if (isset($PF['ForeignKey'])) {#Ist Fremdschlüssel?
 							$ForeignKeys[$kPF] = $PF['ForeignKey'];
 						}
 					}
@@ -698,13 +698,13 @@ class CData
 						#$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']] = json_decode($a['data'], 1);
 						
 						$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][ $a['id'] ] = array_replace_recursive(
-						(array) $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']],
+						(array) ($D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']]??[]),
 						(array) json_decode($a['data'], 1));
 						
 						$d[ $a['path_hash'] ] = &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
 
 						#ForeignKey Anhang
-						foreach((array)$ForeignKeys AS $kFK => $FK) {
+						foreach((array)($ForeignKeys??[]) AS $kFK => $FK) {
 							if($savePatern[$kType][$kFK]['ForeignKey']) {
 								$D[ $a['parent_path_hash'] ][ $a['type_id'] ][ $kFK ]['D'][ $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']][ $kFK ] ][ $a['type_id'] ]['D'][$a['id']] 
 								= &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
@@ -754,9 +754,10 @@ class CData
 						$_cache[ $_sqlmd5 ] = [
 							'Source'	=> serialize([$kType => $F[$kType] ]),
 							'Tag'		=> $kType.'/'.implode('/',array_keys( $F[$kType])),
-							'Data'		=> serialize($D['']),
+							'Data'		=> serialize($D['']), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
 						];
-						$this->CCache->set_cache($_cache);
+						##print_r($_cache);
+						###$this->CCache->set_cache($_cache);
 					}
 				}
 					
@@ -848,7 +849,7 @@ class CCache
 		while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
 			$D[$a['Id']] = ($a['Ttl'] > $now)?$a:false; #Bei veralteten Wert, wird false zugewiesen, dadurch sollte set_cache ausgeführt werden und erfrischt werden
 		}
-		return $D;
+		return $D??[];
 	}
 
 	/*
@@ -864,7 +865,7 @@ class CCache
 			$stmt->bindParam(':tag', $vP['Tag']);
 			$stmt->bindParam(':data', $vP['Data'], SQLITE3_BLOB);
 		}
-	###	return $stmt->execute() !== false;
+		return $stmt->execute() !== false;
 	}
 
 	/* Cache bereinigen */
