@@ -616,16 +616,17 @@ class CData
 	function get_object(&$D = null, &$F=null, $Parent_Hash=[], $Parent_Type = '', $Parent_Id = '') {
 		static $stLevel = 0;
 		
-		$D = ($stLevel==0)?['' => $D]:$D;
+		##$D = ($stLevel==0)?['' => $D]:$D;
 		if($stLevel==0) {
-			##$saveD = $D;
-			##$D == null;
+			$saveD = $D;
+			$D = null;
 
 			##$_sqlmd5 = md5(serialize($F));
 			#echo "{$_sqlmd5}<br>";
 			##$_CacheData = $this->CCache->get_cache($_sqlmd5);
 			#echo md5(serialize($F)).'<br>';
 		}
+		
 		
 		
 
@@ -638,13 +639,16 @@ class CData
 					$_sqlmd5 = md5(serialize([$kType => $F[$kType] ]));
 					$_CacheData = $this->CCache->get_cache($_sqlmd5);
 				}
-				if($stLevel==0 && isset($_CacheData[$_sqlmd5]) ) {
+				if($stLevel==0 && isset($_CacheData[$_sqlmd5])) {
+					##echo "Cache Laden<br>";
 					#$D[''] = unserialize($_CacheData[$_sqlmd5]['Data']);
 					$d = unserialize($_CacheData[$_sqlmd5]['Data']);
-					$D[''] = array_replace((array)$D[''],(array)$d);
+					##$D[''] = array_replace((array)$D[''],(array)$d);
+					#print_r($d);echo "<br>";
+					$D[''][$kType] = $d[$kType];
 				}
 				else {
-
+					#echo "$kType<br>";
 					$W1 = $W = $L = $W_ID = '';
 					#1. Erstelle Bedinung
 					$kHash = ($Parent_Hash)?implode("','",(array)$Parent_Hash[$kType]):"";
@@ -754,10 +758,10 @@ class CData
 						$_cache[ $_sqlmd5 ] = [
 							'Source'	=> serialize([$kType => $F[$kType] ]),
 							'Tag'		=> $kType.'/'.implode('/',array_keys( $F[$kType])),
-							'Data'		=> serialize($D['']), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
+							'Data'		=> serialize([$kType =>  $D[''][$kType]] ), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
 						];
-						##print_r($_cache);
-						###$this->CCache->set_cache($_cache);
+						#print_r($_cache);
+						$this->CCache->set_cache($_cache);
 					}
 				}
 					
@@ -766,7 +770,7 @@ class CData
 
 		
 		if($stLevel == 0) {
-			$D = $D[ '' ];
+			#$D = $D[ '' ];
 			/*
 			if(!$_CacheData) {
 				$_cache[ $_sqlmd5 ] = [
@@ -779,7 +783,8 @@ class CData
 				$dd = unserialize($_CacheData[$_sqlmd5]['Data']);
 			}
 			*/
-			##$D = array_replace((array)$saveD,(array)$D['']);
+			
+			$D = array_replace_recursive((array)$saveD,(array)$D['']);
 		}
 
 	}
@@ -844,11 +849,16 @@ class CCache
 	function get_cache($id) {
 		$_id = (is_array($id))?implode("','",(array)$id):$id;
 		$W = " id IN ('{$_id}')";
-		$qry = $this->SQL->query("SELECT id AS Id, source AS Source, ttl AS Ttl, tag AS Tag, data AS Data FROM  wp_cache WHERE {$W}" );
-		$now = time()-(24*60*60);
+		#$now = time()-(24*60*60);
+		$now = time();
+		$qry = $this->SQL->query("SELECT id AS Id, source AS Source, ttl AS Ttl, tag AS Tag, data AS Data FROM  wp_cache WHERE {$W} AND ttl > {$now}" );
 		while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-			$D[$a['Id']] = ($a['Ttl'] > $now)?$a:false; #Bei veralteten Wert, wird false zugewiesen, dadurch sollte set_cache ausgeführt werden und erfrischt werden
+			$D[$a['Id']] = $a;
 		}
+		#Erhöhe TTL um weitere 24h wenn diese in der letzten Stunde einmal abgerufen wurde. Dadurch wird häufig abgefragter Cache am leben gehalten.
+		$stmt = $this->SQL->prepare("UPDATE wp_cache SET ttl = {$now}+(24*60*60) WHERE {$W} AND ttl > {$now} AND ttl < {$now}+60*60 ");
+		$stmt->execute();
+	
 		return $D??[];
 	}
 
@@ -858,7 +868,7 @@ class CCache
 	function set_cache($P) {
 		$stmt = $this->SQL->prepare('REPLACE INTO wp_cache (id, ttl, source, tag, data) VALUES (:id, :ttl, :source, :tag, :data)');
 		foreach((array)$P AS $kP => $vP){
-			$vP['Ttl'] = ($vP['Ttl'])?",'{$vP['Ttl']}'":time()+24*60*60;
+			$vP['Ttl'] = (isset($vP['Ttl']))?",'{$vP['Ttl']}'":time()+24*60*60;
 			$stmt->bindParam(':id', $kP);
 			$stmt->bindParam(':ttl', $vP['Ttl'], \SQLITE3_INTEGER );
 			$stmt->bindParam(':source', $vP['Source']);
@@ -873,7 +883,7 @@ class CCache
 		if($P['Tag']) {
 			$this->SQL->query("DELETE FROM wp_cache WHERE tag LIKE '{$P['Tag']}%' ");
 		}
-		$time = time()-24*60*60;
-		$this->SQL->query("DELETE FROM wp_cache WHERE itimestamp < {$time} ");
+		$time = time();
+		$this->SQL->query("DELETE FROM wp_cache WHERE ttl < {$time} ");
 	}
 }
