@@ -43,12 +43,15 @@
 
 	#Sortieren:
 	$dd['WHAREGOUSE]['O'][0]['Stock'] = 'DESC';
+	Sortieren Speziall Befehle: ID, UTIMESTAMP, ITIMESTAMP
 
 	Mit Row & Slot Angabe je Attribut wird das Attribut in der wp_data_att_slot Tabelle gespeichert in Slot werden Sprachen nicht unterstüzt. Dadurch kann die Performance verbessert werden. Ohne diese Angabe wird es vertikal in der wp_data_att gespeichert
 
 
 ===============================
 ##Changelog:
+#2.05
++ Sortieren nach UTIMESTAMP und ITIMESTAMP hinzugefügt.
 #2.04
 + Cache Level2 - Klasse für den Cache erstellt. Dadurch werden alle Abfragen an get_object gechacht und durch set_oject wird dieser bereinigt
 ! Fix: Wenn ein Zweig gelöscht wird, wurden die Attribute unter wp_data_att nicht mit gelöscht.
@@ -656,12 +659,19 @@ class CData
 
 					#Order By
 					$O = '';
+					
 					if ($Type['O']??false) {
 						
 						foreach ((array) $F[$kType]['O'] as $kR => $R) {
 							foreach ((array) $R as $key => $value) {
 								if ($key == 'ID') {
 									$O .= (($O) ? ',' : '') . " dtmp0.id {$value} ";
+								}
+								else if ($key == 'UTIMESTAMP') {
+									$O .= (($O) ? ',' : '') . " (SELECT utimestamp FROM wp_data d WHERE dtmp0.parent_path_hash = d.path_hash AND dtmp0.id = d.id AND dtmp0.type_id = d.type_id ) {$value} ";
+								}
+								else if ($key == 'ITIMESTAMP') {
+									$O .= (($O) ? ',' : '') . " (SELECT itimestamp FROM wp_data d WHERE dtmp0.parent_path_hash = d.path_hash AND dtmp0.id = d.id AND dtmp0.type_id = d.type_id ) {$value} ";
 								} else {
 									$O .= (($O) ? ',' : '') . " (SELECT value FROM wp_data_att WHERE dtmp0.parent_path_hash = path_hash AND attribute_id = '{$key}' ) {$value}";
 							
@@ -675,7 +685,6 @@ class CData
 					$_Hash = null;
 					
 					##echo "SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}<br>";
-					
 					$qry = $this->SQL->query("SELECT id, type_id, parent_path_hash,path_hash, data FROM wp_data_cache dtmp0 WHERE {$W} {$O} {$L}");
 					while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
 						$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][ $a['id'] ] = array_replace_recursive(
