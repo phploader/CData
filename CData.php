@@ -30,7 +30,7 @@
 	$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK'] = []; // Gib bis Ebene 3 die drei Knoten aus.
 	$dd['WAREHOUSE']['W'][0]['ID'] = 'W1'; // Filtere Nach WAREHUSE ID W1
 	$dd['WAREHOUSE']['STORAGE']['W'][0]['Active'] = [1]; // Gib nur Active STORAGE aller Warehouse aus
-	$dd['STORAGE']['W'][0]['Title|>'] = 'R002'; // Gib alle ab R002 aus. Möglich: [NOTIN|LIKE-%|LIKE%-|LIKE%%|>|>=|<=|<]
+	$dd['STORAGE']['W'][0]['Title']['>'] = 'R002'; // Gib alle ab R002 aus. Möglich: [NOTIN|LIKE-%|LIKE%-|LIKE%%|>|>=|<=|<]
 	$dd['STORAGE']['W'][0]['Title'] = ['R001','R002']; // Gib mit Tittle R001,T002 Datensätze aus
 	$dd['STORAGE']['L']['START'] = 1; // Begine ab 1. Gilt für Storage, kann auch für unteren Knoten angegeben werden
 	$dd['STORAGE']['L']['STEP'] = 2; // maximal 2 Datensätze ausgeben. Gilt für Storage, kann auch für unteren Knoten angegeben werden
@@ -50,6 +50,8 @@
 
 ===============================
 ##Changelog:
+#2.06
+! Sortieren nach einem Feld ist nicht möglich, behoben.
 #2.05
 + Sortieren nach UTIMESTAMP und ITIMESTAMP hinzugefügt.
 #2.04
@@ -650,7 +652,7 @@ class CData
 					}
 
 					$W = $this->_get_where($Type,$savePatern[$kType],0);
-
+					
 					$W = " (dtmp0.type_id = '{$kType}' AND dtmp0.parent_path_hash IN ('{$kHash}') ) {$W}";
 					
 					
@@ -673,8 +675,7 @@ class CData
 								else if ($key == 'ITIMESTAMP') {
 									$O .= (($O) ? ',' : '') . " (SELECT itimestamp FROM wp_data d WHERE dtmp0.parent_path_hash = d.path_hash AND dtmp0.id = d.id AND dtmp0.type_id = d.type_id ) {$value} ";
 								} else {
-									$O .= (($O) ? ',' : '') . " (SELECT value FROM wp_data_att WHERE dtmp0.parent_path_hash = path_hash AND attribute_id = '{$key}' ) {$value}";
-							
+									$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att dt WHERE dtmp0.parent_path_hash = dt.path_hash AND dtmp0.id = dt.id AND dtmp0.type_id = dt.type_id AND attribute_id = '{$key}' ) {$value}";
 								}
 							}
 						}
