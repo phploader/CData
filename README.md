@@ -1,3 +1,6 @@
+## Beschreibung
+Die Klasse Cdata wurde entwickelt, um den Umgang mit Daten und deren Speicherung unabhängig von der Datenbank zu ermöglichen. Sie sorgt dafür, dass der Code klar von der Datenbank abgegrenzt ist und vermeidet die Notwendigkeit, datenbankspezifische Befehle im Code zu verwenden.
+
 ## Pattern Beispiel: 
 ```
 $D['PATTERN']['PLATFORM']['D']['MANUFACTURER'] = [
