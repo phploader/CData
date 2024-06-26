@@ -1,15 +1,17 @@
-#Pattern Beispiel: 
-  $D['PATTERN']['PLATFORM']['D']['MANUFACTURER'] = [
+	#Pattern Beispiel: 
+	```
+	$D['PATTERN']['PLATFORM']['D']['MANUFACTURER'] = [
 	'Active'		=> ['Type' => 'checkbox'],
 	'ParentId'		=> ['Type' => 'id', 'ForeignKey' => 1], #ForeignKey: Beim Pattern kann = 1 übergeben werden. Dadurch kann man ein Feld als Fremdschlüssel kennzeichnen. Bei der Ausgabe wird PARENT->CHILD ausgabe generiert, so dass auch nach Fremdschlüssel selekitert wird.
 	];
- ## Mögliche Attribute: #ToDo: Attribute umsetzen:
+	```
+ ## Mögliche Attribute: (ToDo: Attribute umsetzen:)
  - Type : id, string, number
  - Min : (optional) bei string, gibt mindest Buchstaben an. bei numbers, bestimmt mindest Wert, bereich z.B: -100 oder -100.0000 dann ergibt ein float mit 4 nachkommastellen. ist Min Angegeben, so wird draus ein Pflichtfeld.
  - Max : (optional) bei string, gibt maximal Buchstaben an. bei numbers, bestimmt maximal Wert, bereich z.B: 1000 oder 100.0000 dann ergibt ein float mit 4 nachkommastellen.
 
-#SET Beispiel:
-  $d['WAREHOUSE']['D']['W1'] = [
+	#SET Beispiel:
+	$d['WAREHOUSE']['D']['W1'] = [
 	'Active'	=> 1, //['Value' => -2 ],
 	'Title'		=> 'Warehouse10', //['Value' => 'Warehouse1'],
 	];
@@ -37,6 +39,7 @@
 	$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ID'] = ['A1']; #Kann Filter einer höeren Ebene auf die untere Ebene Anwenden. Z.B: wenn ein Supplier gesucht ist, dieser nur Artiekl von ID A1 beinhalte.
 	$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['ID'] = ['ATT1','ATT2']; #Gib alle Supplier diese Artikel mit Attribut-ID ATT1 oder ATT2 beinhalten.
 	```
+	
 	#Nachschlage Tabelle am besten mit Punkt (optional) als Standard nutzen.
 	$dd['ARTICLE']['ARTICLE.ATTRIBUTE']['D'][ARTICLE_ID.ATTRIBUTE_ID]['Title'] = 'Hallo';
 
