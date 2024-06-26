@@ -23,7 +23,8 @@
 	];
 	$CData->set_object_reqursive($d);
 
-#GET Beispiel:
+	#GET Beispiel:
+	```
 	$dd['WAREHOUSE'] = []; // gib nur WAREHOUSE konnen aus
 	$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK'] = []; // Gib bis Ebene 3 die drei Knoten aus.
 	$dd['WAREHOUSE']['W'][0]['ID'] = 'W1'; // Filtere Nach WAREHUSE ID W1
@@ -35,7 +36,7 @@
 	$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK']['A']['Stock'] = ['SUM','COUNT','AVG','MIN','MAX']; #Aggregate COUNT,SUM,AVG,MIN,MAX Ermittelt für das Feld Stock. Ist nur für nummerische Werte möglich
 	$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ID'] = ['A1']; #Kann Filter einer höeren Ebene auf die untere Ebene Anwenden. Z.B: wenn ein Supplier gesucht ist, dieser nur Artiekl von ID A1 beinhalte.
 	$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['ID'] = ['ATT1','ATT2']; #Gib alle Supplier diese Artikel mit Attribut-ID ATT1 oder ATT2 beinhalten.
-
+	```
 	#Nachschlage Tabelle am besten mit Punkt (optional) als Standard nutzen.
 	$dd['ARTICLE']['ARTICLE.ATTRIBUTE']['D'][ARTICLE_ID.ATTRIBUTE_ID]['Title'] = 'Hallo';
 
