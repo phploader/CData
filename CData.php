@@ -1,6 +1,9 @@
 <?php
 /** DOC
- * Pattern Beispiel: 
+@version 2.06
+@license https://opensource.org/license/lgpl-3-0 GNU Public License
+ 
+*#Pattern Beispiel: 
   $D['PATTERN']['PLATFORM']['D']['MANUFACTURER'] = [
 	'Active'		=> ['Type' => 'checkbox'],
 	'ParentId'		=> ['Type' => 'id', 'ForeignKey' => 1], #ForeignKey: Beim Pattern kann = 1 übergeben werden. Dadurch kann man ein Feld als Fremdschlüssel kennzeichnen. Bei der Ausgabe wird PARENT->CHILD ausgabe generiert, so dass auch nach Fremdschlüssel selekitert wird.
@@ -10,7 +13,7 @@
  - Min : (optional) bei string, gibt mindest Buchstaben an. bei numbers, bestimmt mindest Wert, bereich z.B: -100 oder -100.0000 dann ergibt ein float mit 4 nachkommastellen. ist Min Angegeben, so wird draus ein Pflichtfeld.
  - Max : (optional) bei string, gibt maximal Buchstaben an. bei numbers, bestimmt maximal Wert, bereich z.B: 1000 oder 100.0000 dann ergibt ein float mit 4 nachkommastellen.
 
- * SET Beispiel:
+*#SET Beispiel:
   $d['WAREHOUSE']['D']['W1'] = [
 	'Active'	=> 1, //['Value' => -2 ],
 	'Title'		=> 'Warehouse10', //['Value' => 'Warehouse1'],
@@ -25,7 +28,7 @@
 	];
 	$CData->set_object_reqursive($d);
 
-	GET Beispiel:
+*#GET Beispiel:
 	$dd['WAREHOUSE'] = []; // gib nur WAREHOUSE konnen aus
 	$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK'] = []; // Gib bis Ebene 3 die drei Knoten aus.
 	$dd['WAREHOUSE']['W'][0]['ID'] = 'W1'; // Filtere Nach WAREHUSE ID W1
@@ -45,12 +48,13 @@
 	$dd['WHAREGOUSE]['O'][0]['Stock'] = 'DESC';
 	Sortieren Speziall Befehle: ID, UTIMESTAMP, ITIMESTAMP
 
-	Mit Row & Slot Angabe je Attribut wird das Attribut in der wp_data_att_slot Tabelle gespeichert in Slot werden Sprachen nicht unterstüzt. Dadurch kann die Performance verbessert werden. Ohne diese Angabe wird es vertikal in der wp_data_att gespeichert
-
-
 ===============================
 ##Changelog:
 #2.06
++ LGPL Lizensiert.
+~ Überflüssige Tabelle wp_data_att_slot entfernt.
++ namespace wp; hinzugefügt
+~ Überflüssige Tabelle wp_data_child entfernt.
 ! Sortieren nach einem Feld ist nicht möglich, behoben.
 #2.05
 + Sortieren nach UTIMESTAMP und ITIMESTAMP hinzugefügt.
@@ -102,14 +106,11 @@
 ! Fehler
 ===============================
 
-#ToDo:
-BUG: IN  Tabelle wp_data_att ist womöglich unter der Spalte path_hash Parent hash ID hinterlegt, so muss in  => parent_path_hash umbennant werden!.
+@todo
+BUG: IN Tabelle wp_data_att ist womöglich unter der Spalte path_hash Parent hash ID hinterlegt, so muss in  => parent_path_hash umbennant werden!.
 
-#Performance Optimierung:
-##1. #~2 Cache: Speichert komplete Zweige als array in DB anhand des Filters. Wird gelöscht sobald Daten im Zweig sich ändern.
-##2. #3 Cache: Speichert. Speichert alle Werte anhand Filter für einige Minuten bzw. für fest gelegten Zeitraum, ignoriert dafür jegliche Änderungen am Zweigen.
-## Tabelle wp_data_child wird womöglich nicht mehr gerbraucht, wenn Count Abfragen durch Cache gespeichert werden.
 */
+namespace wp;
 class CData
 {
 	private $SQL;
@@ -122,10 +123,10 @@ class CData
 	{
 		if($P['DB']) {
 			if(file_exists($P['DB']['FILENAME'])) {
-				$this->SQL = new SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
+				$this->SQL = new \SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
 				$this->CCache = new CCache([ 'DB' => ['FILENAME' => $P['DB']['FILENAME'].'.cache' ] ]);
 			} else {
-				$this->SQL = new SQLite3($P['DB']['FILENAME']);
+				$this->SQL = new \SQLite3($P['DB']['FILENAME']);
 				$this->CreateDB();
 			}
 			if($P['PRAGMA']??false) {
@@ -188,86 +189,6 @@ class CData
 			CREATE INDEX IF NOT EXISTS "wp_data_att_utimestamp" ON "wp_data_att" ("utimestamp");
 			CREATE INDEX IF NOT EXISTS "wp_data_att_path_hash" ON "wp_data_att" ("path_hash");
 
-			CREATE TABLE IF NOT EXISTS "wp_data_att_slot" (
-			"id" text NOT NULL,
-			"type_id" text NOT NULL,
-			"path_hash" integer NOT NULL,
-			"row_id" integer NOT NULL,
-			"attribute_id0" text NULL,
-			"value0" text NULL,
-			"sort0" integer NULL,
-			"utimestamp0" integer NULL,
-			"itimestamp0" integer NULL,
-			"attribute_id1" text NULL,
-			"value1" text NULL,
-			"sort1" integer NULL,
-			"utimestamp1" integer NULL,
-			"itimestamp1" integer NULL,
-			"attribute_id2" text NULL,
-			"value2" text NULL,
-			"sort2" integer NULL,
-			"utimestamp2" integer NULL,
-			"itimestamp2" integer NULL,
-			"attribute_id3" text NULL,
-			"value3" text NULL,
-			"sort3" integer NULL,
-			"utimestamp3" integer NULL,
-			"itimestamp3" integer NULL,
-			"attribute_id4" text NULL,
-			"value4" text NULL,
-			"sort4" integer NULL,
-			"utimestamp4" integer NULL,
-			"itimestamp4" integer NULL,
-			"attribute_id5" text NULL,
-			"value5" text NULL,
-			"sort5" integer NULL,
-			"utimestamp5" integer NULL,
-			"itimestamp5" integer NULL,
-			"attribute_id6" text NULL,
-			"value6" text NULL,
-			"sort6" integer NULL,
-			"utimestamp6" integer NULL,
-			"itimestamp6" integer NULL,
-			"attribute_id7" text NULL,
-			"value7" text NULL,
-			"sort7" integer NULL,
-			"utimestamp7" integer NULL,
-			"itimestamp7" integer NULL,
-			"attribute_id8" text NULL,
-			"value8" text NULL,
-			"sort8" integer NULL,
-			"utimestamp8" integer NULL,
-			"itimestamp8" integer NULL,
-			"attribute_id9" text NULL,
-			"value9" text NULL,
-			"sort9" integer NULL,
-			"utimestamp9" integer NULL,
-			"itimestamp9" integer NULL,
-			PRIMARY KEY ("id", "type_id", "path_hash", "row_id")
-			);
-
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort0" ON "wp_data_att_slot" ("sort0");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort1" ON "wp_data_att_slot" ("sort1");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort2" ON "wp_data_att_slot" ("sort2");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort3" ON "wp_data_att_slot" ("sort3");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort4" ON "wp_data_att_slot" ("sort4");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort5" ON "wp_data_att_slot" ("sort5");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort6" ON "wp_data_att_slot" ("sort6");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort7" ON "wp_data_att_slot" ("sort7");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort8" ON "wp_data_att_slot" ("sort8");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_sort9" ON "wp_data_att_slot" ("sort9");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id9_language_id9" ON "wp_data_att_slot" ("id", "type_id", "attribute_id9");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id8_language_id8" ON "wp_data_att_slot" ("id", "type_id", "attribute_id8");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id7_language_id7" ON "wp_data_att_slot" ("id", "type_id", "attribute_id7");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id6_language_id6" ON "wp_data_att_slot" ("id", "type_id", "attribute_id6");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id5_language_id5" ON "wp_data_att_slot" ("id", "type_id", "attribute_id5");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id4_language_id4" ON "wp_data_att_slot" ("id", "type_id", "attribute_id4");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id3_language_id3" ON "wp_data_att_slot" ("id", "type_id", "attribute_id3");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id2_language_id2" ON "wp_data_att_slot" ("id", "type_id", "attribute_id2");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id1_language_id1" ON "wp_data_att_slot" ("id", "type_id", "attribute_id1");
-			CREATE UNIQUE INDEX IF NOT EXISTS "wp_data_att_slot_id_type_id_attribute_id0_language_id0" ON "wp_data_att_slot" ("id", "type_id", "attribute_id0");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_slot_path_hash" ON "wp_data_att_slot" ("path_hash");
-
 			CREATE TABLE IF NOT EXISTS "wp_data_cache" (
 			"id" text NOT NULL,
 			"type_id" text NOT NULL,
@@ -283,22 +204,6 @@ class CData
 			CREATE INDEX IF NOT EXISTS "wp_data_tmp_utimestamp" ON "wp_data_cache" ("utimestamp");
 			CREATE INDEX IF NOT EXISTS "wp_data_tmp_parent_path_hash" ON "wp_data_cache" ("parent_path_hash");
 			CREATE INDEX IF NOT EXISTS "wp_data_tmp_path_hash" ON "wp_data_cache" ("path_hash");
-
-			CREATE TABLE IF NOT EXISTS "wp_data_child" (
-			"id" text NOT NULL,
-			"type_id" text NOT NULL,
-			"child_path_hash" integer NOT NULL,
-			"child_type_id" text NOT NULL,
-			"child_count" integer NULL DEFAULT 0,
-			"utimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
-			"itimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
-			PRIMARY KEY ("id", "type_id", "child_path_hash", "child_type_id")
-			);
-			CREATE INDEX IF NOT EXISTS "wp_data_child_child_type_id" ON "wp_data_child" ("child_type_id");
-			CREATE INDEX IF NOT EXISTS "wp_data_child_utimestamp" ON "wp_data_child" ("utimestamp");
-			CREATE INDEX IF NOT EXISTS "wp_data_child_type_id" ON "wp_data_child" ("type_id");
-			CREATE INDEX IF NOT EXISTS "wp_data_child_id" ON "wp_data_child" ("id");
-			CREATE INDEX IF NOT EXISTS "wp_data_child_path_hash" ON "wp_data_child" ("child_path_hash");
 		'); 
 	}
 	function getPattern(&$D) {
@@ -476,14 +381,7 @@ class CData
 									");
 									
 			}
-			#4. Aktuallisiere data_child Counts
-			/*
-			$this->SQL->query("REPLACE INTO wp_data_child (id, type_id, child_path_hash, child_type_id, child_count) 
-									SELECT parent_data_id, parent_type_id, path_hash, type_id, count(*) FROM wp_data
-									WHERE path_hash IN ('{$Keys}')
-									GROUP BY parent_data_id,path_hash,type_id
-									");
-			*/
+			
 		}
 		
 	}
@@ -760,9 +658,9 @@ class CCache
 	{
 		if($P['DB']) {
 			if(file_exists($P['DB']['FILENAME'])) {
-				$this->SQL = new SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
+				$this->SQL = new \SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
 			} else {
-				$this->SQL = new SQLite3($P['DB']['FILENAME']);
+				$this->SQL = new \SQLite3($P['DB']['FILENAME']);
 				$this->CreateDB();
 			}
 			if($P['PRAGMA']??false) {
