@@ -1,6 +1,6 @@
 <?php
 /** DOC
-@version 2.06
+@version 2.07
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
  
 *#Pattern Beispiel: 
@@ -50,6 +50,8 @@
 
 ===============================
 ##Changelog:
+#2.07
++ backup Funktion hinzugefügt, zur erstellung von backups der Datenbanken. $CData->backup();
 #2.06
 + LGPL Lizensiert.
 ~ Überflüssige Tabelle wp_data_att_slot entfernt.
@@ -115,9 +117,14 @@ class CData
 {
 	private $SQL;
 	private $CCache;
+	private $Param;
+	private $BackupDestinationPath;
+	private $BackupPassword;
+
 	/**
 	 * 'PATTERN'	=> Pattern
 	 * 'DB'			=> [FILENAME,FLAGS] Datenbank Zugang
+	 * 'BACKUP'		=> [DestinationPath] (optional)
 	*/
 	function __construct($P=null)
 	{
@@ -142,7 +149,13 @@ class CData
 			}
 		} else { exit('kein DB-Übergabe Parameter!'); }
 
+		$this->BackupDestinationPath = ($P['BACKUP']['DestinationPath'])??'backup/';
+		
+
+		$this->BackupPassword = $P['BACKUP']['BackupPassword'];
+			
 		$this->PATTERN = $P['PATTERN'];
+		$this->Param['DB'] = $P['DB'];
 		$this->refreshCacheObjeckt = [];
 	}
 
@@ -210,6 +223,38 @@ class CData
 		$D['PATTERN'] = $this->PATTERN;
 	}
 
+	/**
+	 * Erstellt eine Sicherung der Datenbank
+	 */
+	function backup() {
+		if($this->Param['DB']) {
+			#Erstelle Unter Verzeichnis
+			if(!is_dir($this->BackupDestinationPath)) {
+				mkdir($this->BackupDestinationPath,0777,true);
+			}
+
+			$datetime = date("YmdHis");
+			#Backup der DB
+			$path = pathinfo($this->Param['DB']['FILENAME']);
+			$backup = new \SQLite3("{$this->BackupDestinationPath}{$datetime}_{$path['basename']}");
+			$this->SQL->backup($backup);
+			$backup->exec("VACUUM");
+			$backup->close();
+
+			#Ziped
+			$zip = new \ZipArchive();
+			if( $zip->open("{$this->BackupDestinationPath}{$datetime}_{$path['basename']}.zip", \ZipArchive::CREATE) ) {
+				$zip->addFile("{$this->BackupDestinationPath}{$datetime}_{$path['basename']}","{$datetime}_{$path['basename']}");
+				if($this->BackupPassword) {
+					$zip->setEncryptionName("{$datetime}_{$path['basename']}", \ZipArchive::EM_AES_256, $this->BackupPassword);
+				}
+				$zip->close();
+
+				#Lösche Sicherungskopie
+				unlink("{$this->BackupDestinationPath}{$datetime}_{$path['basename']}");
+			}
+		}
+	}
 
 	/**
 	 * Erzeugt ein float Wert aus einem Text Folge und kann für Sortierung in der Datenbank verwendet werden
@@ -337,6 +382,48 @@ class CData
 		}
 	}
 	
+	/**
+	 * repariert die wp_data_cache bzw. stellt wieder her.
+	 */
+	function repair() {
+
+			#2. Selektiere Datensätze anhand des PathHash
+			$qry = $this->SQL->query("SELECT d.id, d.type_id, d.path_hash, attribute_id, value
+						FROM wp_data d LEFT JOIN wp_data_att dat ON d.id = dat.id AND d.type_id = dat.type_id AND d.path_hash = dat.path_hash
+						WHERE 1
+			");
+			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+				$set_d[$a['path_hash']][$a['type_id']]['D'][$a['id']][$a['attribute_id']] = $a['value'];
+			}
+			
+			#3. Speichere neue Datensätze im Cache ab
+			$IU_DATA_ATT = '';
+			foreach ((array) $set_d as $kPath => $Path) {
+				foreach ((array) $Path as $kType => $Type) {
+					foreach ((array) $Type['D'] as $kSup => $Sup) {
+						
+						$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$kPath}'";
+						
+						$json = $this->SQL->escapeString(json_encode($Sup));
+						$ChildHash = hash("crc32b", $kPath.$kType.$kSup);
+						$IU_DATA_ATT .= ",'{$ChildHash}'";
+						$IU_DATA_ATT .= ",'" . str_replace([',"":""','"":"",','"":""','"":null'],'',$json) . "'"; #replace entfernt leere Key Werte
+						
+						$IU_DATA_ATT .= ")";
+					}
+				}
+			}
+			
+			if ($IU_DATA_ATT) {
+				$this->SQL->query("REPLACE INTO wp_data_cache (id, type_id, parent_path_hash,path_hash,data) VALUES {$IU_DATA_ATT} 
+									ON CONFLICT(id, type_id, parent_path_hash) DO UPDATE SET
+										data =			CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data		THEN excluded.data ELSE data END,
+										utimestamp =	CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data
+														THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
+									");
+									
+			}
+	}
 	private function _set_cache(&$RefrechCache_PathHash=null) {
 		
 		if($RefrechCache_PathHash) {
@@ -673,6 +760,7 @@ class CCache
 				PRAGMA read_uncommitted = true;	PRAGMA journal_mode = wal;
 				");
 			}
+			$this->Param['DB'] = $P['DB'];
 		} else { exit('kein DB-Übergabe Parameter!'); }
 	}
 
@@ -693,6 +781,18 @@ class CCache
 			CREATE INDEX IF NOT EXISTS "wp_cache_ttl" ON "wp_cache" ("ttl");
 			CREATE INDEX IF NOT EXISTS "wp_cache_itimestamp" ON "wp_cache" ("itimestamp");
 			');
+	}
+
+	function backup($P=null) {
+		if($this->Param['DB']) {
+			$datetime = date("YmdHid"); 
+			#Backup der DB
+			$path = pathinfo($this->Param['DB']['FILENAME']);
+			$_path = ($P['DestinationPath'])??$path['dirname'].'/';
+			$backup = new \SQLite3("{$_path}{$datetime}_{$path['basename']}");
+			$this->SQL->backup($backup);
+			$backup->exec("VACUUM");
+		}
 	}
 
 	/*
