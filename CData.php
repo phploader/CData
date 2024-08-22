@@ -52,6 +52,8 @@
 ##Changelog:
 #2.07
 + backup Funktion hinzugefügt, zur erstellung von backups der Datenbanken. $CData->backup();
+~ Fix: Falsche berechnung von Count Ausgebe behoben.
+~ Fix: Falsche berechnung von Count bei einschrenkungen von Objekten.
 #2.06
 + LGPL Lizensiert.
 ~ Überflüssige Tabelle wp_data_att_slot entfernt.
@@ -637,9 +639,9 @@ class CData
 					}
 
 					$W = $this->_get_where($Type,$savePatern[$kType],0);
-					
 					$W = " (dtmp0.type_id = '{$kType}' AND dtmp0.parent_path_hash IN ('{$kHash}') ) {$W}";
-					
+
+					$W_count = " (dtmp0.type_id = '{$kType}' AND dtmp0.parent_path_hash IN ('{$kHash}') )"; #Für Count Berechnung, weil Count die absolute Maximum ausgibt ohne Filterung nach einzelnen Objekten.
 					
 					$L = (isset($F[$kType]['L']['STEP'])) ? "LIMIT 0,{$F[$kType]['L']['STEP']}" : $L;
 					$L = (isset($F[$kType]['L']['START']) && $F[$kType]['L']['STEP']) ? "LIMIT {$F[$kType]['L']['START']},{$F[$kType]['L']['STEP']}" : $L;
@@ -694,7 +696,7 @@ class CData
 					
 
 					#Lese Count aus
-					$qry = $this->SQL->query("SELECT count(*) num, type_id, parent_path_hash, path_hash FROM wp_data_cache dtmp0 WHERE {$W}");
+					$qry = $this->SQL->query("SELECT count(*) num, type_id, parent_path_hash, path_hash FROM wp_data_cache dtmp0 WHERE {$W_count} GROUP BY parent_path_hash,type_id");
 					while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
 						$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['COUNT'] = $a['num'];
 					}
