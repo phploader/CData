@@ -1,6 +1,6 @@
 <?php
 /** DOC
-@version 2.07
+@version 2.08
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
  
 *#Pattern Beispiel: 
@@ -50,6 +50,8 @@
 
 ===============================
 ##Changelog:
+#2.08
++ Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Lavel Cache 2 wird zugleich geleert.
 #2.07
 + backup Funktion hinzugefügt, zur erstellung von backups der Datenbanken. $CData->backup();
 ~ Fix: Falsche berechnung von Count Ausgebe behoben.
@@ -149,6 +151,17 @@ class CData
 				PRAGMA wal_autocheckpoint=1000; PRAGMA encoding = 'UTF-8'; 
 				");
 			}
+
+			#Prüfe ob wp_data_cache Tabelle leer ist, fals ja, dann befülle wenn wp_data Tabelle nicht leer ist
+			$querySingle = $this->SQL->querySingle("SELECT id FROM wp_data_cache LIMIT 1" );
+			if(!$querySingle) { 
+				$querySingle = $this->SQL->querySingle("SELECT id FROM wp_data LIMIT 1" );
+				if($querySingle) {
+					$this->CCache->flush(['Tag' => '%']);
+					$this->repair();
+				}
+			}
+
 		} else { exit('kein DB-Übergabe Parameter!'); }
 
 		$this->BackupDestinationPath = ($P['BACKUP']['DestinationPath'])??'backup/';
@@ -240,6 +253,7 @@ class CData
 			$path = pathinfo($this->Param['DB']['FILENAME']);
 			$backup = new \SQLite3("{$this->BackupDestinationPath}{$datetime}_{$path['basename']}");
 			$this->SQL->backup($backup);
+			#Todo: Um mehr Speicher zu sparren kann wp_data_cache-Tabelle geleert werden
 			$backup->exec("VACUUM");
 			$backup->close();
 
@@ -714,7 +728,7 @@ class CData
 						$_cache[ $_sqlmd5 ] = [
 							'Source'	=> serialize([$kType => $F[$kType] ]),
 							'Tag'		=> $kType.'/'.implode('/',array_keys( $F[$kType])),
-							'Data'		=> serialize([$kType =>  $D[''][$kType]] ), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
+							'Data'		=> serialize([$kType => $D[''][$kType]] ), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
 						];
 						$this->CCache->set_cache($_cache);
 					}
@@ -832,9 +846,12 @@ class CCache
 		return $stmt->execute() !== false;
 	}
 
-	/* Cache bereinigen */
-	function flush($P) {
-		if($P['Tag']) {
+	/** Cache bereinigen 
+	 * (optional) $P['Tag'] = Lösche nach Tag, oder '%' für alles
+	 * Wird kein Tag übergeben, wird lediglich nach abgelaufenden TTL Cache bereinigt
+	*/
+	function flush($P=null) {
+		if(isset($P['Tag'])) {
 			$this->SQL->query("DELETE FROM wp_cache WHERE tag LIKE '{$P['Tag']}%' ");
 		}
 		$time = time();
