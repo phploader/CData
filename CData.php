@@ -114,7 +114,7 @@
 
 @todo
 BUG: IN Tabelle wp_data_att ist womöglich unter der Spalte path_hash Parent hash ID hinterlegt, so muss in  => parent_path_hash umbennant werden!.
-
+BUG: Order in der zweiten Ebene z.B: $F[AAA][BBB][O][Feld] = 'DESC';  funktioniert nicht!! Außerdem soll ein [index] hinzugefügt werden.$F[AAA][BBB][O][>>>0<<<][Feld]
 */
 namespace wp;
 class CData
@@ -157,8 +157,8 @@ class CData
 			if(!$querySingle) { 
 				$querySingle = $this->SQL->querySingle("SELECT id FROM wp_data LIMIT 1" );
 				if($querySingle) {
-					$this->CCache->flush(['Tag' => '%']);
-					$this->repair();
+					$this->CCache->flush(['Tag' => '%']);#Lösche den L2-Cache
+					$this->repair(); #Erstelle L1-Cache
 				}
 			}
 

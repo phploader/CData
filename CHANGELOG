@@ -1,3 +1,9 @@
+#2.08
++ Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Lavel Cache 2 wird zugleich geleert.
+#2.07
++ backup Funktion hinzugefügt, zur erstellung von backups der Datenbanken. $CData->backup();
+~ Fix: Falsche berechnung von Count Ausgebe behoben.
+~ Fix: Falsche berechnung von Count bei einschrenkungen von Objekten.
 #2.06
 + LGPL Lizensiert.
 ~ Überflüssige Tabelle wp_data_att_slot entfernt.
