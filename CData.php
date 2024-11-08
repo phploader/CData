@@ -1,6 +1,6 @@
 <?php
 /** DOC
-@version 2.08
+@version 2.09
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
  
 *#Pattern Beispiel: 
@@ -50,6 +50,8 @@
 
 ===============================
 ##Changelog:
+#2.09 (DB Update erforderlich!)
+~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 #2.08
 + Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Lavel Cache 2 wird zugleich geleert.
 #2.07
@@ -58,9 +60,9 @@
 ~ Fix: Falsche berechnung von Count bei einschrenkungen von Objekten.
 #2.06
 + LGPL Lizensiert.
-~ Überflüssige Tabelle wp_data_att_slot entfernt.
+- Überflüssige Tabelle wp_data_att_slot entfernt.
 + namespace wp; hinzugefügt
-~ Überflüssige Tabelle wp_data_child entfernt.
+- Überflüssige Tabelle wp_data_child entfernt.
 ! Sortieren nach einem Feld ist nicht möglich, behoben.
 #2.05
 + Sortieren nach UTIMESTAMP und ITIMESTAMP hinzugefügt.
@@ -108,13 +110,16 @@
 
 #Legende:
 + Neu
+- Entfernt
 ~ Überarbeitet
 ! Fehler
 ===============================
 
 @todo
-BUG: IN Tabelle wp_data_att ist womöglich unter der Spalte path_hash Parent hash ID hinterlegt, so muss in  => parent_path_hash umbennant werden!.
 BUG: Order in der zweiten Ebene z.B: $F[AAA][BBB][O][Feld] = 'DESC';  funktioniert nicht!! Außerdem soll ein [index] hinzugefügt werden.$F[AAA][BBB][O][>>>0<<<][Feld]
+BUG: Wenn beides übergeben wird; $[A][D][123][B][0][test] = ''; $[A][D][abc][B][0][test] = 'Wert'; dann wird letztere nicht merh gespeichert, weil beim vorderen leerer Wert Übergeben wird, dann werden folgende ATT alle gelöscht.
+BUG: Prüfen ob folgende Reihenfolge funktioniert. $[A][D][123][B][0][test][C][0][test] = 'test1'; $[A][D][abc][B][0][test][C][0][test] = 'Wert2'; OB Beim Filtern nach A.ID = 'abc', wirlkich nur C.test = Wert2 ausgegeben wird und nicht zusätzlich vom anderen Knotten.
+
 */
 namespace wp;
 class CData
@@ -305,8 +310,8 @@ class CData
 				
 				foreach ((array) $Type['D'] AS $kSup => $Sup) { #PlATFORM.D[x]
 				
-					$_Parent_Hash = hash("crc32b", $Parent_Hash.$kType.$kSup);
-					$_RefrechCache[$Parent_Hash] = true; #aktuallisiere anhand des path_hash
+					$Child_Hash = hash("crc32b", $Parent_Hash.$kType.$kSup);
+					$_RefrechCache[$Parent_Hash] = true; #aktuallisiere anhand des parent_path_hash
 					
 					if(($Sup['Active']??false) != -2 ) { #Insert/ Update
 
@@ -322,7 +327,7 @@ class CData
 									
 									$stLevel++;
 									$this->PATTERN = $savePatern[$kType]['D']??=[];
-									$this->set_object($d,$_Parent_Hash,$kType,$kSup);
+									$this->set_object($d,$Child_Hash,$kType,$kSup);
 									$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
 									$stLevel--;
 								}
@@ -334,7 +339,7 @@ class CData
 										$IU_DATA_ATT .= ")";
 									}
 									else {
-										$D_DATA_ATT .= (($D_DATA_ATT) ? ' OR ' : '') ." (id = '{$kSup}' AND type_id = '{$kType}' AND attribute_id = '{$kATT}' AND path_hash = '{$Parent_Hash}' )";
+										$D_DATA_ATT .= (($D_DATA_ATT) ? ' OR ' : '') ." (id = '{$kSup}' AND type_id = '{$kType}' AND attribute_id = '{$kATT}' AND parent_path_hash = '{$Parent_Hash}' )";
 									}
 									
 								}
@@ -344,8 +349,8 @@ class CData
 						
 					}
 					else { #Delete
-						$D_DATA .= (($D_DATA) ? ' OR ' : '') . " (id = '{$kSup}' AND type_id = '{$kType}' AND parent_type_id = '{$Parent_Type}' AND parent_data_id = '{$Parent_Id}' AND path_hash = '{$Parent_Hash}')";
-						$D_DATA_ATT .= (($D_DATA_ATT) ? ' OR ' : '') ." (id = '{$kSup}' AND type_id = '{$kType}' AND path_hash = '{$Parent_Hash}' )"; #lösche alle Attribute
+						$D_DATA .= (($D_DATA) ? ' OR ' : '') . " (id = '{$kSup}' AND type_id = '{$kType}' AND parent_type_id = '{$Parent_Type}' AND parent_data_id = '{$Parent_Id}' AND parent_path_hash = '{$Parent_Hash}')";
+						$D_DATA_ATT .= (($D_DATA_ATT) ? ' OR ' : '') ." (id = '{$kSup}' AND type_id = '{$kType}' AND parent_path_hash = '{$Parent_Hash}' )"; #lösche alle Attribute
 					}
 				}
 			}
@@ -358,8 +363,8 @@ class CData
 			#echo $IU_DATA;echo "<br>";
 			#echo $IU_DATA_ATT;
 			if ($IU_DATA??false) {
-				$this->SQL->exec("INSERT INTO wp_data (id, type_id, path_hash, parent_type_id, parent_data_id) VALUES {$IU_DATA} 
-							ON CONFLICT(id, type_id, path_hash) DO UPDATE SET
+				$this->SQL->exec("INSERT INTO wp_data (id, type_id, parent_path_hash, parent_type_id, parent_data_id) VALUES {$IU_DATA} 
+							ON CONFLICT(id, type_id, parent_path_hash) DO UPDATE SET
 								parent_data_id =			CASE WHEN excluded.parent_data_id IS NOT NULL	AND ifnull(parent_data_id,'') <> excluded.parent_data_id		THEN excluded.parent_data_id ELSE parent_data_id END,
 								parent_type_id =			CASE WHEN excluded.parent_type_id IS NOT NULL	AND ifnull(parent_type_id,'') <> excluded.parent_type_id		THEN excluded.parent_type_id ELSE parent_type_id END,
 								utimestamp =	CASE WHEN 
@@ -368,8 +373,8 @@ class CData
 							");
 			}
 			if ($IU_DATA_ATT??false) {
-				$this->SQL->query("INSERT INTO wp_data_att (id, type_id,path_hash, attribute_id, sort, value ) VALUES {$IU_DATA_ATT} 
-							ON CONFLICT(id,  type_id, path_hash, attribute_id) DO UPDATE SET
+				$this->SQL->query("INSERT INTO wp_data_att (id, type_id,parent_path_hash, attribute_id, sort, value ) VALUES {$IU_DATA_ATT} 
+							ON CONFLICT(id,  type_id, parent_path_hash, attribute_id) DO UPDATE SET
 								value =			CASE WHEN excluded.value IS NOT NULL	AND ifnull(value,'') <> excluded.value		THEN excluded.value ELSE value END,
 								sort =			CASE WHEN excluded.sort IS NOT NULL	AND ifnull(sort,'') <> excluded.sort		THEN excluded.sort ELSE sort END,
 								utimestamp =	CASE WHEN 
@@ -404,12 +409,12 @@ class CData
 	function repair() {
 
 			#2. Selektiere Datensätze anhand des PathHash
-			$qry = $this->SQL->query("SELECT d.id, d.type_id, d.path_hash, attribute_id, value
-						FROM wp_data d LEFT JOIN wp_data_att dat ON d.id = dat.id AND d.type_id = dat.type_id AND d.path_hash = dat.path_hash
+			$qry = $this->SQL->query("SELECT d.id, d.type_id, d.parent_path_hash, attribute_id, value
+						FROM wp_data d LEFT JOIN wp_data_att dat ON d.id = dat.id AND d.type_id = dat.type_id AND d.parent_path_hash = dat.parent_path_hash
 						WHERE 1
 			");
 			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-				$set_d[$a['path_hash']][$a['type_id']]['D'][$a['id']][$a['attribute_id']] = $a['value'];
+				$set_d[$a['parent_path_hash']][$a['type_id']]['D'][$a['id']][$a['attribute_id']] = $a['value'];
 			}
 			
 			#3. Speichere neue Datensätze im Cache ab
@@ -449,12 +454,12 @@ class CData
 			$this->SQL->query("DELETE FROM wp_data_cache WHERE parent_path_hash IN ('{$Keys}')");
 			
 			#2. Selektiere Datensätze anhand des PathHash
-			$qry = $this->SQL->query("SELECT d.id, d.type_id, d.path_hash, attribute_id, value
-						FROM wp_data d LEFT JOIN wp_data_att dat ON d.id = dat.id AND d.type_id = dat.type_id AND d.path_hash = dat.path_hash
-						WHERE d.path_hash IN ('{$Keys}')
+			$qry = $this->SQL->query("SELECT d.id, d.type_id, d.parent_path_hash, attribute_id, value
+						FROM wp_data d LEFT JOIN wp_data_att dat ON d.id = dat.id AND d.type_id = dat.type_id AND d.parent_path_hash = dat.parent_path_hash
+						WHERE d.parent_path_hash IN ('{$Keys}')
 			");
 			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
-				$set_d[$a['path_hash']][$a['type_id']]['D'][$a['id']][$a['attribute_id']] = $a['value'];
+				$set_d[$a['parent_path_hash']][$a['type_id']]['D'][$a['id']][$a['attribute_id']] = $a['value'];
 			}
 			
 			#3. Speichere neue Datensätze im Cache ab
@@ -511,7 +516,7 @@ class CData
 						#$Value = (is_array($AND)) ? implode("','", $AND) : $AND;
 						#$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND dt.attribute_id IN ('{$kAND}') AND dt.value IN ('{$Value}') )";
 						$Value = $this->_get_where_Operations($kAND, $AND,$Level);
-						$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp{$Level}.parent_path_hash = dt.path_hash AND dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND dt.attribute_id IN ('{$kAND}') AND ({$Value}) )";
+						$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp{$Level}.parent_path_hash = dt.parent_path_hash AND dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND dt.attribute_id IN ('{$kAND}') AND ({$Value}) )";
 					}
 					elseif( in_array($kAND,array_keys((array)$Pattern['D']) )) {# Weitere Ebene Prüfen
 						$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 2 FROM wp_data_cache dtmp".($Level+1) ." WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash ";
@@ -671,12 +676,12 @@ class CData
 									$O .= (($O) ? ',' : '') . " dtmp0.id {$value} ";
 								}
 								else if ($key == 'UTIMESTAMP') {
-									$O .= (($O) ? ',' : '') . " (SELECT utimestamp FROM wp_data d WHERE dtmp0.parent_path_hash = d.path_hash AND dtmp0.id = d.id AND dtmp0.type_id = d.type_id ) {$value} ";
+									$O .= (($O) ? ',' : '') . " (SELECT utimestamp FROM wp_data d WHERE dtmp0.parent_path_hash = d.parent_path_hash AND dtmp0.id = d.id AND dtmp0.type_id = d.type_id ) {$value} ";
 								}
 								else if ($key == 'ITIMESTAMP') {
-									$O .= (($O) ? ',' : '') . " (SELECT itimestamp FROM wp_data d WHERE dtmp0.parent_path_hash = d.path_hash AND dtmp0.id = d.id AND dtmp0.type_id = d.type_id ) {$value} ";
+									$O .= (($O) ? ',' : '') . " (SELECT itimestamp FROM wp_data d WHERE dtmp0.parent_path_hash = d.parent_path_hash AND dtmp0.id = d.id AND dtmp0.type_id = d.type_id ) {$value} ";
 								} else {
-									$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att dt WHERE dtmp0.parent_path_hash = dt.path_hash AND dtmp0.id = dt.id AND dtmp0.type_id = dt.type_id AND attribute_id = '{$key}' ) {$value}";
+									$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att dt WHERE dtmp0.parent_path_hash = dt.parent_path_hash AND dtmp0.id = dt.id AND dtmp0.type_id = dt.type_id AND attribute_id = '{$key}' ) {$value}";
 								}
 							}
 						}

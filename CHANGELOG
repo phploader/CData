@@ -1,3 +1,5 @@
+#2.09 (DB Update erforderlich!)
+~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 #2.08
 + Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Lavel Cache 2 wird zugleich geleert.
 #2.07
@@ -6,9 +8,9 @@
 ~ Fix: Falsche berechnung von Count bei einschrenkungen von Objekten.
 #2.06
 + LGPL Lizensiert.
-~ Überflüssige Tabelle wp_data_att_slot entfernt.
+- Überflüssige Tabelle wp_data_att_slot entfernt.
 + namespace wp; hinzugefügt
-~ Überflüssige Tabelle wp_data_child entfernt.
+- Überflüssige Tabelle wp_data_child entfernt.
 ! Sortieren nach einem Feld ist nicht möglich, behoben.
 #2.05
 + Sortieren nach UTIMESTAMP und ITIMESTAMP hinzugefügt.
@@ -56,5 +58,59 @@
 
 #Legende:
 + Neu
+- Entfernt
 ~ Überarbeitet
 ! Fehler
+
+
+#Update DB 2.08 => 2.09
+BEGIN;
+CREATE TABLE "adminer_wp_data" (
+  "id" text NOT NULL,
+  "type_id" text NOT NULL,
+  "parent_path_hash" integer NOT NULL,
+  "parent_type_id" text NOT NULL,
+  "parent_data_id" text NOT NULL,
+  "utimestamp" integer NULL DEFAULT (cast(strftime('%s', 'now') as int)),
+  "itimestamp" integer NULL DEFAULT (cast(strftime('%s', 'now') as int)),
+  PRIMARY KEY ("id", "type_id", "parent_path_hash")
+);
+INSERT INTO "adminer_wp_data" ("id", "type_id", "parent_path_hash", "parent_type_id", "parent_data_id", "utimestamp", "itimestamp") SELECT "id", "type_id", "path_hash", "parent_type_id", "parent_data_id", "utimestamp", "itimestamp" FROM "wp_data";
+#DROP TABLE "wp_data";
+ALTER TABLE "wp_data" RENAME TO "wp_data_alt";
+ALTER TABLE "adminer_wp_data" RENAME TO "wp_data";
+CREATE INDEX "wp_data_parent_type_id_parent_data_id" ON "wp_data" ("parent_type_id", "parent_data_id");
+CREATE INDEX "wp_data_id" ON "wp_data" ("id");
+CREATE INDEX "wp_data_type_id" ON "wp_data" ("type_id");
+CREATE INDEX "wp_data_utimestamp" ON "wp_data" ("utimestamp");
+CREATE INDEX "wp_data_to_type_id" ON "wp_data" ("parent_type_id");
+CREATE INDEX "wp_data_id_type_id" ON "wp_data" ("id", "type_id");
+CREATE INDEX "wp_data_id_type_id_to_type_id" ON "wp_data" ("id", "type_id");
+CREATE INDEX "wp_data_id_path_hash" ON "wp_data" ("parent_path_hash");
+#-------
+CREATE TABLE "adminer_wp_data_att" (
+  "id" text COLLATE 'BINARY' NOT NULL,
+  "type_id" text NOT NULL,
+  "parent_path_hash" integer NOT NULL,
+  "attribute_id" text NOT NULL,
+  "value" text NULL,
+  "sort" numeric NULL,
+  "utimestamp" integer NULL DEFAULT (cast(strftime('%s', 'now') as int)),
+  "itimestamp" integer NULL DEFAULT (cast(strftime('%s', 'now') as int)),
+  PRIMARY KEY ("id", "type_id", "parent_path_hash", "attribute_id")
+);
+INSERT INTO "adminer_wp_data_att" ("id", "type_id", "parent_path_hash", "attribute_id", "value", "sort", "utimestamp", "itimestamp") SELECT "id", "type_id", "path_hash", "attribute_id", "value", "sort", "utimestamp", "itimestamp" FROM "wp_data_att";
+#DROP TABLE "wp_data_att";
+ALTER TABLE "wp_data_att" RENAME TO "wp_data_att_alt";
+ALTER TABLE "adminer_wp_data_att" RENAME TO "wp_data_att";
+CREATE INDEX "wp_data_att_value_hash" ON "wp_data_att" ("sort");
+CREATE INDEX "wp_data_att_id_type_id_attribute_id" ON "wp_data_att" ("id", "type_id", "attribute_id");
+CREATE INDEX "wp_data_att_id_type_id" ON "wp_data_att" ("id", "type_id");
+CREATE INDEX "wp_data_att_attribute_id" ON "wp_data_att" ("attribute_id");
+CREATE INDEX "wp_data_att_type_id" ON "wp_data_att" ("type_id");
+CREATE INDEX "wp_data_att_id" ON "wp_data_att" ("id");
+CREATE INDEX "wp_data_att_utimestamp" ON "wp_data_att" ("utimestamp");
+CREATE INDEX "wp_data_att_path_hash" ON "wp_data_att" ("parent_path_hash");
+COMMIT;
+
+Wenn alles OK, dann kann wp_data_alt und wp_data_att_alt gelöscht werden 
