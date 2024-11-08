@@ -184,12 +184,12 @@ class CData
 			CREATE TABLE IF NOT EXISTS "wp_data" (
 			"id" text NOT NULL,
 			"type_id" text NOT NULL,
-			"path_hash" integer NOT NULL,
+			"parent_path_hash" integer NOT NULL,
 			"parent_type_id" text NOT NULL,
 			"parent_data_id" text NOT NULL,
 			"utimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
 			"itimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
-			PRIMARY KEY ("id", "type_id", "path_hash")
+			PRIMARY KEY ("id", "type_id", "parent_path_hash")
 			);
 
 			CREATE INDEX IF NOT EXISTS "wp_data_parent_type_id_parent_data_id" ON "wp_data" ("parent_type_id", "parent_data_id");
@@ -199,18 +199,18 @@ class CData
 			CREATE INDEX IF NOT EXISTS "wp_data_to_type_id" ON "wp_data" ("parent_type_id");
 			CREATE INDEX IF NOT EXISTS "wp_data_id_type_id" ON "wp_data" ("id", "type_id");
 			CREATE INDEX IF NOT EXISTS "wp_data_id_type_id_to_type_id" ON "wp_data" ("id", "type_id");
-			CREATE INDEX IF NOT EXISTS "wp_data_id_path_hash" ON "wp_data" ("path_hash");
+			CREATE INDEX IF NOT EXISTS "wp_data_id_parent_path_hash" ON "wp_data" ("parent_path_hash");
 
 			CREATE TABLE IF NOT EXISTS "wp_data_att" (
 			"id" text COLLATE \'BINARY\' NOT NULL,
 			"type_id" text NOT NULL,
-			"path_hash" integer NOT NULL,
+			"parent_path_hash" integer NOT NULL,
 			"attribute_id" text NOT NULL,
 			"value" text NULL,
 			"sort" numeric NULL,
 			"utimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
 			"itimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
-			PRIMARY KEY ("id", "type_id", "path_hash", "attribute_id")
+			PRIMARY KEY ("id", "type_id", "parent_path_hash", "attribute_id")
 			);
 
 			CREATE INDEX IF NOT EXISTS "wp_data_att_value_hash" ON "wp_data_att" ("sort");
@@ -220,7 +220,7 @@ class CData
 			CREATE INDEX IF NOT EXISTS "wp_data_att_type_id" ON "wp_data_att" ("type_id");
 			CREATE INDEX IF NOT EXISTS "wp_data_att_id" ON "wp_data_att" ("id");
 			CREATE INDEX IF NOT EXISTS "wp_data_att_utimestamp" ON "wp_data_att" ("utimestamp");
-			CREATE INDEX IF NOT EXISTS "wp_data_att_path_hash" ON "wp_data_att" ("path_hash");
+			CREATE INDEX IF NOT EXISTS "wp_data_att_parent_path_hash" ON "wp_data_att" ("parent_path_hash");
 
 			CREATE TABLE IF NOT EXISTS "wp_data_cache" (
 			"id" text NOT NULL,
