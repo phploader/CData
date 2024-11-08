@@ -501,7 +501,7 @@ class CData
 	 */
 	private function _get_where(&$F,&$Pattern,$Level=0) {
 		if($F['W']??false) { #Prüft ob es sich um eine Where anweisung sich handelt
-			$W .= ' AND ( ';
+			$W = ' AND ( ';
 			foreach ((array) $F['W'] as $kOR => $OR) { #OR Bedinungen durchlaufen
 				$WOR .= ($WOR)? ' OR ( ' : '';
 				$WAND = '';
