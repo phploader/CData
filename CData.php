@@ -51,7 +51,7 @@
 ===============================
 ##Changelog:
 #2.09 (DB Update erforderlich!)
-~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
+~ Fix: path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 #2.08
 + Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Lavel Cache 2 wird zugleich geleert.
 #2.07
