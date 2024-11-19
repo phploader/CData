@@ -51,13 +51,14 @@
 ===============================
 ##Changelog:
 #2.09 (DB Update erforderlich!)
-~ Fix: path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
+~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
+! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
 #2.08
 + Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Lavel Cache 2 wird zugleich geleert.
 #2.07
 + backup Funktion hinzugefügt, zur erstellung von backups der Datenbanken. $CData->backup();
-~ Fix: Falsche berechnung von Count Ausgebe behoben.
-~ Fix: Falsche berechnung von Count bei einschrenkungen von Objekten.
+! Fix: Falsche berechnung von Count Ausgebe behoben.
+! Fix: Falsche berechnung von Count bei einschrenkungen von Objekten.
 #2.06
 + LGPL Lizensiert.
 - Überflüssige Tabelle wp_data_att_slot entfernt.
@@ -117,7 +118,6 @@
 
 @todo
 BUG: Order in der zweiten Ebene z.B: $F[AAA][BBB][O][Feld] = 'DESC';  funktioniert nicht!! Außerdem soll ein [index] hinzugefügt werden.$F[AAA][BBB][O][>>>0<<<][Feld]
-BUG: Wenn beides übergeben wird; $[A][D][123][B][0][test] = ''; $[A][D][abc][B][0][test] = 'Wert'; dann wird letztere nicht merh gespeichert, weil beim vorderen leerer Wert Übergeben wird, dann werden folgende ATT alle gelöscht.
 BUG: Prüfen ob folgende Reihenfolge funktioniert. $[A][D][123][B][0][test][C][0][test] = 'test1'; $[A][D][abc][B][0][test][C][0][test] = 'Wert2'; OB Beim Filtern nach A.ID = 'abc', wirlkich nur C.test = Wert2 ausgegeben wird und nicht zusätzlich vom anderen Knotten.
 
 */
@@ -309,30 +309,31 @@ class CData
 				$this->CCache->flush(['Tag' => "{$kType}/"]); #Cache bereinigen #ToDo: prüfen ob in der ebene veräderungen vorgenohmen wurden und nicht einfach pauschal leeren.
 				
 				foreach ((array) $Type['D'] AS $kSup => $Sup) { #PlATFORM.D[x]
-				
-					$Child_Hash = hash("crc32b", $Parent_Hash.$kType.$kSup);
-					$_RefrechCache[$Parent_Hash] = true; #aktuallisiere anhand des parent_path_hash
+					
+					$_RefrechCache[$Parent_Hash] = true; #aktuallisiere anhand des parent_path_hash Todo: Genauer !
 					
 					if(($Sup['Active']??false) != -2 ) { #Insert/ Update
+						$Child_Hash = hash("crc32b", $Parent_Hash.$kType.$kSup);
 
 						$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$Parent_Type}','{$Parent_Id}')";
 						
-						
+						$d = [];
 						foreach ((array) $Sup as $kATT => $ATT) { #PlATFORM.D.x.[ATTRIBUTE]
 							
 								if (is_array($ATT) && isset($ATT['D'])) { #ist ein ATT eine weitere Ebene? PlATFORM.D.x.ATTRIBUTE.D.[x]
 									$d[$kATT]['D'] = &$ATT['D'];
 									##$d[$kATT]['D'][$kSubATT][$kType] = $kSup; 
 									
-									
 									$stLevel++;
 									$this->PATTERN = $savePatern[$kType]['D']??=[];
+									
 									$this->set_object($d,$Child_Hash,$kType,$kSup);
+									#$this->set_object($d,$Parent_Hash,$kType,$kSup);
 									$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
 									$stLevel--;
 								}
 								elseif($this->PATTERN[$kType][$kATT]??false) {
-									if($ATT != '' || ($ATT !== NULL && $this->PATTERN[$kType][$kATT]['ForeignKey'] == 1) ) {
+									if($ATT != '' || ($ATT !== NULL && isset($this->PATTERN[$kType][$kATT]['ForeignKey']) && $this->PATTERN[$kType][$kATT]['ForeignKey'] == 1) ) {
 										$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$kATT}'";#Setze Attribute
 										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->_Value2SortHash($ATT)."'" : ",NULL";
 										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->SQL->escapeString($ATT)."'" : ",NULL";
@@ -733,7 +734,7 @@ class CData
 						$_cache[ $_sqlmd5 ] = [
 							'Source'	=> serialize([$kType => $F[$kType] ]),
 							'Tag'		=> $kType.'/'.implode('/',array_keys( $F[$kType])),
-							'Data'		=> serialize([$kType => $D[''][$kType]] ), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
+							'Data'		=> serialize([$kType => $D[''][$kType]??''] ), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
 						];
 						$this->CCache->set_cache($_cache);
 					}
