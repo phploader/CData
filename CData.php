@@ -53,6 +53,8 @@
 #2.09 (DB Update erforderlich!)
 ~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 ! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
++ Funktion zum Setzen von Pattern set_Pattern() hinzugefügt. Dadurch ist es möglich naträglich Pattern zu setzen oder zu ändern
+~ getPattern in getPattern umbennant getPattern(ist veraltet)
 #2.08
 + Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Lavel Cache 2 wird zugleich geleert.
 #2.07
@@ -239,8 +241,26 @@ class CData
 			CREATE INDEX IF NOT EXISTS "wp_data_tmp_path_hash" ON "wp_data_cache" ("path_hash");
 		'); 
 	}
-	function getPattern(&$D) {
+	
+	/**
+	 * Gibt Pattern aus
+	 * @param mixed $D
+	 * @return void
+	 */
+	function get_Pattern(&$D) {
 		$D['PATTERN'] = $this->PATTERN;
+	}
+	#[\Deprecated(message: "use get_Pattern() instead", since: "2.9")]
+	function getPattern(&$D) {
+		$this->get_Pattern($D);
+	}
+	/**
+	 * Pattern setzen
+	 * @param mixed $D['PATTERN']
+	 * @return void
+	 */
+	function set_Pattern(&$D) {
+		$this->PATTERN = $D['PATTERN'];
 	}
 
 	/**
