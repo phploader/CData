@@ -133,7 +133,7 @@ class CData
 	/**
 	 * 'PATTERN'	=> Pattern
 	 * 'DB'			=> [FILENAME,FLAGS] Datenbank Zugang
-	 * 'BACKUP'		=> [DestinationPath] (optional)
+	 * 'BACKUP'		=> [DestinationPath, BackupPassword] (optional)
 	*/
 	function __construct($P=null)
 	{
