@@ -26,7 +26,7 @@
 		'Active'	=> 0,
 		'Title' => 'StorageB',
 	];
-	$CData->set_object_reqursive($d);
+	$CData->set_object($d);
 
 *#GET Beispiel:
 	$dd['WAREHOUSE'] = []; // gib nur WAREHOUSE konnen aus

@@ -16,6 +16,9 @@ $D['PATTERN']['PLATFORM']['D']['MANUFACTURER'] = [
  - Max : (optional) bei string, gibt maximal Buchstaben an. bei numbers, bestimmt maximal Wert, bereich z.B: 1000 oder 100.0000 dann ergibt ein float mit 4 nachkommastellen.
 
 # SET 
+
+Um Daten in die Datenbank zu schreiben, muss die gleiche Array-Struktur verwendet werden. Mit der Set-Funktion können Daten erstellt, aktualisiert oder entfernt werden. Ob Daten neu angelegt oder aktualisiert werden, wird anhand der ID entschieden. Für die Aktualisierung ist es nicht notwendig, den gesamten Array-Baum zu übergeben; es genügt, lediglich die Änderungen zu übermitteln. Zum Löschen eines Datensatzes muss der Wert von "Active" auf -2 gesetzt werden. Dadurch wird der Datensatz zusammen mit seiner Unterstruktur aus der Datenbank entfernt.
+
 Beispiel:
 ```
 $d['WAREHOUSE']['D']['W1'] = [
@@ -32,28 +35,37 @@ $d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2'] = [
 	'Active'	=> 0,
 	'Title' => 'StorageB',
 ];
-$CData->set_object_reqursive($d);
+$CData->set_object($d);
 ```
 - UPDATE, 
 
 
 # GET 
+
+Um die gewünschten Daten auszugeben, muss zunächst ein Filter übergeben werden. Dieser ist in einer Struktur ähnlich wie ein Pattern angelegt. Darüber hinaus können zusätzliche Filter zur Datenauswahl übermittelt werden, was im Folgenden erläutert wird.
+
 Beispiel:	
 ```
-$dd['WAREHOUSE'] = []; // gib nur WAREHOUSE konnen aus
-$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK'] = []; // Gib bis Ebene 3 die drei Knoten aus.
+$f['WAREHOUSE'] = []; // gib nur WAREHOUSE konnen aus
+$f['WAREHOUSE']['STORAGE']['ARTICLE_STOCK'] = []; // Gib bis Ebene 3 die drei Knoten aus.
+$CData->get_object($d,$f);
 ```
 - Gibt Bedinungslos alle Daten aus.
 
 ### WHERE:
+
+Ein Filter kann sowohl mit AND- als auch mit OR-Anweisungen erstellt werden. Im folgenden Beispiel werden verschiedene Möglichkeiten aufgezeigt, wie ein solcher Filter gestaltet werden kann. Zudem besteht die Möglichkeit, die Oberstruktur (auch als "Vater" bezeichnet) durch die Unterstruktur (oder "Kinder") mithilfe eines Filters zu bestimmen, um festzulegen, ob diese in den Ausgaben enthalten sein sollen.
+
+Beispiel:
 ```
-$dd['WAREHOUSE']['W'][0]['ID'] = 'W1'; // Filtere Nach WAREHUSE ID W1
-$dd['WAREHOUSE']['STORAGE']['W'][0]['Active'] = [1]; // Gib nur Active STORAGE aller Warehouse aus
-$dd['STORAGE']['W'][0]['Title']['>'] = 'R002'; // Gib alle ab R002 aus. Möglich: [NOTIN|LIKE-%|LIKE%-|LIKE%%|>|>=|<=|<]
-$dd['STORAGE']['W'][0]['Title'] = ['R001','R002']; // Gib mit Tittle R001,T002 Datensätze aus
-$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK']['A']['Stock'] = ['SUM','COUNT','AVG','MIN','MAX']; #Aggregate COUNT,SUM,AVG,MIN,MAX Ermittelt für das Feld Stock. Ist nur für nummerische Werte möglich
-$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ID'] = ['A1']; #Kann Filter einer höeren Ebene auf die untere Ebene Anwenden. Z.B: wenn ein Supplier gesucht ist, dieser nur Artiekl von ID A1 beinhalte.
-$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['ID'] = ['ATT1','ATT2']; #Gib alle Supplier diese Artikel mit Attribut-ID ATT1 oder ATT2 beinhalten.
+$f['WAREHOUSE']['W'][0]['ID'] = 'W1'; // Filtere Nach WAREHUSE ID W1
+$f['WAREHOUSE']['STORAGE']['W'][0]['Active'] = [1]; // Gib nur Active STORAGE aller Warehouse aus
+$f['STORAGE']['W'][0]['Title']['>'] = 'R002'; // Gib alle ab R002 aus. Möglich: [NOTIN|LIKE-%|LIKE%-|LIKE%%|>|>=|<=|<]
+$f['STORAGE']['W'][0]['Title'] = ['R001','R002']; // Gib mit Tittle R001,T002 Datensätze aus
+$f['WAREHOUSE']['STORAGE']['ARTICLE_STOCK']['A']['Stock'] = ['SUM','COUNT','AVG','MIN','MAX']; #Aggregate COUNT,SUM,AVG,MIN,MAX Ermittelt für das Feld Stock. Ist nur für nummerische Werte möglich
+$f['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ID'] = ['A1']; #Kann Filter einer höeren Ebene auf die untere Ebene Anwenden. Z.B: wenn ein Supplier gesucht ist, dieser nur Artiekl von ID A1 beinhalte.
+$f['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['ID'] = ['ATT1','ATT2']; #Gib alle Supplier diese Artikel mit Attribut-ID ATT1 oder ATT2 beinhalten.
+$CData->get_object($d,$f);
 ```
 - OR: [W][0] | [W][1] | ...  Anweisungen
 - AND: [W][0] | [W][0] | ... Anweisungen
@@ -61,15 +73,25 @@ $dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['ID'
 
 
 ### Limit:
+
+Die Daten können pro Zweig limitiert werden, indem START und STEP festgelegt werden.
+
+Beispiel:
 ```
-$dd['STORAGE']['L']['START'] = 1;
-$dd['STORAGE']['L']['STEP'] = 2;
+$f['STORAGE']['L']['START'] = 1;
+$f['STORAGE']['L']['STEP'] = 2;
+$CData->get_object($d,$f);
 ```
 - START: (erforderlich) Begine ab 1. Gilt für Storage, kann auch für unteren Knoten angegeben werden
 - STEP: (optional) maximal 2 Datensätze ausgeben. Gilt für Storage, kann auch für unteren Knoten angegeben werden
 
 ### Sortieren:
+
+Die Sortierung kann für jeden Zweig individuell festgelegt werden.
+
+Beispiel:
 ```
-$dd['WHAREGOUSE]['O'][0]['Stock'] = 'DESC';
+$f['WHAREGOUSE]['O'][0]['Stock'] = 'DESC';
+$CData->get_object($d,$f);
 ```
 Sortieren Speziall Befehle: ID, UTIMESTAMP, ITIMESTAMP

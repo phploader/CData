@@ -1,0 +1,22 @@
+{
+    "name": "wp/cdata",
+    "description": "CData präsentiert ein innovatives Datenbankkonzept, das den schnellen Transfer von Daten ermöglicht. Entwickler müssen sich nicht um SQL-Befehle, deren Optimierung oder Sicherheitsaspekte kümmern. CData verfügt über Level-1- und Level-2-Caching, um die Performance weiter zu steigern. Die Datenbankabfragen sind teilweise bis zu zehnmal schneller als herkömmliche MySQL-Abfragen. CFile bietet umfassende Datenfunktionen an.",
+    "keywords": [ "cdata", "ccache", "cfile","sqlite"],
+    "license": "LGPL-3.0-or-later",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Waldemar Preis",
+            "homepage": ""
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "ext-curl": "*",
+		"ext-gd": "*",
+		"ext-zip": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*"
+
+    }
+}
