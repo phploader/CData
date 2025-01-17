@@ -20,6 +20,8 @@
         "ext-mbstring": "*"
     },
 	"autoload" : {
-		"psr-4" : { "wp\\" : ""}
+		"psr-4" : { 
+			"wp\\" : "/"
+		}
 	}
 }
