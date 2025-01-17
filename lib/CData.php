@@ -1,4 +1,6 @@
 <?php
+namespace wp;
+
 /** DOC
 @version 2.09
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
@@ -123,7 +125,7 @@ BUG: Order in der zweiten Ebene z.B: $F[AAA][BBB][O][Feld] = 'DESC';  funktionie
 BUG: Prüfen ob folgende Reihenfolge funktioniert. $[A][D][123][B][0][test][C][0][test] = 'test1'; $[A][D][abc][B][0][test][C][0][test] = 'Wert2'; OB Beim Filtern nach A.ID = 'abc', wirlkich nur C.test = Wert2 ausgegeben wird und nicht zusätzlich vom anderen Knotten.
 
 */
-namespace wp;
+
 class CData
 {
 	private $SQL;
