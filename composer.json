@@ -21,7 +21,12 @@
     },
 	"autoload" : {
 		"psr-4" : { 
-			"wp\\" : "lib/"
+			"wp\\" : ["lib/"]
+		}
+	},
+	"autoload-dev" : {
+		"psr-4" : { 
+			"wp\\" : ["lib/"]
 		}
 	}
 }
