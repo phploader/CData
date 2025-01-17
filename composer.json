@@ -20,13 +20,9 @@
         "ext-mbstring": "*"
     },
 	"autoload" : {
-		"psr-4" : { 
-			"wp\\" : ["lib/"]
-		}
+		"psr-4" : { "wp\\" : "lib/" }
 	},
 	"autoload-dev" : {
-		"psr-4" : { 
-			"wp\\" : ["lib/"]
-		}
+		"psr-4" : { "wp\\" : "lib/" }
 	}
 }
