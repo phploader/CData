@@ -53,6 +53,8 @@ namespace wp;
 
 ===============================
 ##Changelog:
+#2.10
++ Wenn Pfad zur erstellenden DB nicht vorhanden ist, wird dieses automatisch erstellt.
 #2.09 (DB Update erforderlich!)
 ~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 ! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
@@ -147,6 +149,8 @@ class CData
 				$this->SQL = new \SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
 				$this->CCache = new CCache([ 'DB' => ['FILENAME' => $P['DB']['FILENAME'].'.cache' ] ]);
 			} else {
+				$path= pathinfo($P['DB']['FILENAME']);
+				mkdir($path['dirname'], 0777, true);
 				$this->SQL = new \SQLite3($P['DB']['FILENAME']);
 				$this->CreateDB();
 			}
