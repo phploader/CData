@@ -313,7 +313,7 @@ class CData
 		$s = strtolower($s);
 		$ar = unpack("C*", $s);
 		$stLen = (count($ar) < 6)?count($ar):5;#Maximal die ersten 5 Zeichen
-		$hash??='';
+		$hash='';
 		for($i = 0; $i < $stLen; $i++){
 			$hash .= str_pad($ar[$i+1],3,0,STR_PAD_LEFT);
 		}
@@ -641,7 +641,7 @@ class CData
 		if(!$Operation) { #Wenn keine Operation und kein Wert übergeben wurde aber nur ein kFild, dann ist der Value als Leer zu betrachten
 			$aloneOV .= ($aloneOV?',':" {$_Fild} IN (")."'{$Ope}'"; #Ohne Operator übergab 
 		}
-		$O .= ($aloneOV)?$aloneOV.')':'';
+		$O = ($aloneOV)?$aloneOV.')':'';
 		$O .= "{$OV}";
 	
 	return " {$O} ";
