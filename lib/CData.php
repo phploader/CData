@@ -3,7 +3,7 @@
 namespace wp;
 
 /** DOC
-@version 2.09
+@version 2.10
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
  
 *#Pattern Beispiel: 
@@ -53,7 +53,8 @@ namespace wp;
 
 ===============================
 ##Changelog:
-#2.10
+#2.10 (DB Update erforderlich!)
+! Fix: "parent_path_hash" und "path_hash" von integer zur text geändert. Weil sonnst werden Werte wie 4e292770 falsch iterpretiert, bzw. als Int => "INF" statt string.
 + Wenn Pfad zur erstellenden DB nicht vorhanden ist, wird dieses automatisch erstellt.
 #2.09 (DB Update erforderlich!)
 ~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
@@ -193,7 +194,7 @@ class CData
 			CREATE TABLE IF NOT EXISTS "wp_data" (
 			"id" text NOT NULL,
 			"type_id" text NOT NULL,
-			"parent_path_hash" integer NOT NULL,
+			"parent_path_hash" text NOT NULL,
 			"parent_type_id" text NOT NULL,
 			"parent_data_id" text NOT NULL,
 			"utimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
@@ -213,7 +214,7 @@ class CData
 			CREATE TABLE IF NOT EXISTS "wp_data_att" (
 			"id" text COLLATE \'BINARY\' NOT NULL,
 			"type_id" text NOT NULL,
-			"parent_path_hash" integer NOT NULL,
+			"parent_path_hash" text NOT NULL,
 			"attribute_id" text NOT NULL,
 			"value" text NULL,
 			"sort" numeric NULL,
@@ -234,8 +235,8 @@ class CData
 			CREATE TABLE IF NOT EXISTS "wp_data_cache" (
 			"id" text NOT NULL,
 			"type_id" text NOT NULL,
-			"parent_path_hash" integer NOT NULL,
-			"path_hash" integer NOT NULL,
+			"parent_path_hash" text NOT NULL,
+			"path_hash" text NOT NULL,
 			"data" blob NULL,
 			"utimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
 			"itimestamp" integer NULL DEFAULT (cast(strftime(\'%s\', \'now\') as int)),
