@@ -15,6 +15,9 @@ namespace wp;
  - Type : id, string, number
  - Min : (optional) bei string, gibt mindest Buchstaben an. bei numbers, bestimmt mindest Wert, bereich z.B: -100 oder -100.0000 dann ergibt ein float mit 4 nachkommastellen. ist Min Angegeben, so wird draus ein Pflichtfeld.
  - Max : (optional) bei string, gibt maximal Buchstaben an. bei numbers, bestimmt maximal Wert, bereich z.B: 1000 oder 100.0000 dann ergibt ein float mit 4 nachkommastellen.
+ - Enum : (optional)
+
+
 
 *#SET Beispiel:
   $d['WAREHOUSE']['D']['W1'] = [
@@ -55,7 +58,10 @@ namespace wp;
 ##Changelog:
 #2.10 (DB Update erforderlich!)
 ! Fix: "parent_path_hash" und "path_hash" von integer zur text geändert. Weil sonnst werden Werte wie 4e292770 falsch iterpretiert, bzw. als Int => "INF" statt string.
-+ Wenn Pfad zur erstellenden DB nicht vorhanden ist, wird dieses automatisch erstellt.
++ Wenn Pfad zur erstellenden DB nicht vorhanden ist, wird die Ordnerstruktur, automatisch erstellt.
+! Fix: "Wenn nur ein Knotten abgefragt wird z.B: $F['TAB']", dann wird eine Fatal Error geworfen.
+! Fix: Wenn Datenbank nicht exsistiert, und dierekt dadrauf zugegrifen werden soll, dann wird diese zwar erstellt, jedoch db.cache wird beim  Ersten aufruff nicht erstellt und wirft Fatal Error
+~ unter umständen kann die repair() Funktion wegen Memory überlauf abbrechen, wenn der gesamte Cache wieder hergestellt werden soll. Es wurde nun Schrittweise in die Datenbank geschrieben, 50.000 Datensätze Schrittweise.
 #2.09 (DB Update erforderlich!)
 ~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 ! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
@@ -127,7 +133,8 @@ namespace wp;
 @todo
 BUG: Order in der zweiten Ebene z.B: $F[AAA][BBB][O][Feld] = 'DESC';  funktioniert nicht!! Außerdem soll ein [index] hinzugefügt werden.$F[AAA][BBB][O][>>>0<<<][Feld]
 BUG: Prüfen ob folgende Reihenfolge funktioniert. $[A][D][123][B][0][test][C][0][test] = 'test1'; $[A][D][abc][B][0][test][C][0][test] = 'Wert2'; OB Beim Filtern nach A.ID = 'abc', wirlkich nur C.test = Wert2 ausgegeben wird und nicht zusätzlich vom anderen Knotten.
-
++ Enum: Hinzufügen des Enum Variable, diese den übergebenen Wert abgleicht. Wird ein Wert dieses nicht in Enum hinterlegt ist übergeben, so wird der Wert durch Null ersetzt als ob nichts übergeben wurde.
++ Required: ??? ggf. akzeptans, z.B. null or not null?
 */
 
 class CData
@@ -137,6 +144,8 @@ class CData
 	private $Param;
 	private $BackupDestinationPath;
 	private $BackupPassword;
+	private $MaxMemoryLimit;
+
 
 	/**
 	 * 'PATTERN'	=> Pattern
@@ -148,13 +157,15 @@ class CData
 		if($P['DB']) {
 			if(file_exists($P['DB']['FILENAME'])) {
 				$this->SQL = new \SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
-				$this->CCache = new CCache([ 'DB' => ['FILENAME' => $P['DB']['FILENAME'].'.cache' ] ]);
 			} else {
 				$path= pathinfo($P['DB']['FILENAME']);
 				mkdir($path['dirname'], 0777, true);
 				$this->SQL = new \SQLite3($P['DB']['FILENAME']);
 				$this->CreateDB();
 			}
+
+			$this->CCache = new CCache([ 'DB' => ['FILENAME' => $P['DB']['FILENAME'].'.cache' ] ]);
+
 			if($P['PRAGMA']??false) {
 				$this->SQL->exec($P['PRAGMA']);
 			} else {
@@ -163,9 +174,15 @@ class CData
 				PRAGMA synchronous = 1;			PRAGMA foreign_keys = ON;
 				PRAGMA temp_store = MEMORY;		PRAGMA default_temp_store = MEMORY;
 				PRAGMA read_uncommitted = true;	PRAGMA journal_mode = wal;
-				PRAGMA wal_autocheckpoint=1000; PRAGMA encoding = 'UTF-8'; 
+				PRAGMA wal_autocheckpoint=1000; PRAGMA encoding = 'UTF-8';
 				");
 			}
+			
+			$this->BackupDestinationPath = ($P['BACKUP']['DestinationPath'])??'backup/';
+			$this->BackupPassword = $P['BACKUP']['BackupPassword'];
+			$this->PATTERN = $P['PATTERN'];
+			$this->Param['DB'] = $P['DB'];
+			$this->refreshCacheObjeckt = [];
 
 			#Prüfe ob wp_data_cache Tabelle leer ist, fals ja, dann befülle wenn wp_data Tabelle nicht leer ist
 			$querySingle = $this->SQL->querySingle("SELECT id FROM wp_data_cache LIMIT 1" );
@@ -178,15 +195,6 @@ class CData
 			}
 
 		} else { exit('kein DB-Übergabe Parameter!'); }
-
-		$this->BackupDestinationPath = ($P['BACKUP']['DestinationPath'])??'backup/';
-		
-
-		$this->BackupPassword = $P['BACKUP']['BackupPassword'];
-			
-		$this->PATTERN = $P['PATTERN'];
-		$this->Param['DB'] = $P['DB'];
-		$this->refreshCacheObjeckt = [];
 	}
 
 	private function CreateDB() {
@@ -304,6 +312,7 @@ class CData
 			}
 		}
 	}
+
 
 	/**
 	 * Erzeugt ein float Wert aus einem Text Folge und kann für Sortierung in der Datenbank verwendet werden
@@ -460,6 +469,18 @@ class CData
 						$IU_DATA_ATT .= ",'" . str_replace([',"":""','"":"",','"":""','"":null'],'',$json) . "'"; #replace entfernt leere Key Werte
 						
 						$IU_DATA_ATT .= ")";
+
+						if( $_i > 50000 ) {
+							$this->SQL->query("REPLACE INTO wp_data_cache (id, type_id, parent_path_hash,path_hash,data) VALUES {$IU_DATA_ATT} 
+									ON CONFLICT(id, type_id, parent_path_hash) DO UPDATE SET
+										data =			CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data		THEN excluded.data ELSE data END,
+										utimestamp =	CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data
+														THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
+									");
+							unset($IU_DATA_ATT);
+							$_i=0;
+						}
+						$_i++;
 					}
 				}
 			}
@@ -505,6 +526,16 @@ class CData
 						$IU_DATA_ATT .= ",'" . str_replace([',"":""','"":"",','"":""','"":null'],'',$json) . "'"; #replace entfernt leere Key Werte
 						
 						$IU_DATA_ATT .= ")";
+
+						if( !$this->_isEnoughMemory() ) {
+							$this->SQL->query("REPLACE INTO wp_data_cache (id, type_id, parent_path_hash,path_hash,data) VALUES {$IU_DATA_ATT} 
+									ON CONFLICT(id, type_id, parent_path_hash) DO UPDATE SET
+										data =			CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data		THEN excluded.data ELSE data END,
+										utimestamp =	CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data
+														THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
+									");
+							unset($IU_DATA_ATT);
+						}
 					}
 				}
 			}
@@ -761,7 +792,7 @@ class CData
 					if($stLevel == 0) {
 						$_cache[ $_sqlmd5 ] = [
 							'Source'	=> serialize([$kType => $F[$kType] ]),
-							'Tag'		=> $kType.'/'.implode('/',array_keys( $F[$kType])),
+							'Tag'		=> $kType.'/'.implode('/',array_keys((array) $F[$kType])),
 							'Data'		=> serialize([$kType => $D[''][$kType]??''] ), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
 						];
 						$this->CCache->set_cache($_cache);
