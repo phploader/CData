@@ -1,6 +1,9 @@
 #2.10 (DB Update erforderlich!)
 ! Fix: "parent_path_hash" und "path_hash" von integer zur text geändert. Weil sonnst werden Werte wie 4e292770 falsch iterpretiert, bzw. als Int => "INF" statt string.
-+ Wenn Pfad zur erstellenden DB nicht vorhanden ist, wird dieses automatisch erstellt.
++ Wenn Pfad zur erstellenden DB nicht vorhanden ist, wird die Ordnerstruktur, automatisch erstellt.
+! Fix: "Wenn nur ein Knotten abgefragt wird z.B: $F['TAB']", dann wird eine Fatal Error geworfen.
+! Fix: Wenn Datenbank nicht exsistiert, und dierekt dadrauf zugegrifen werden soll, dann wird diese zwar erstellt, jedoch db.cache wird beim  Ersten aufruff nicht erstellt und wirft Fatal Error
+~ unter umständen kann die repair() Funktion wegen Memory überlauf abbrechen, wenn der gesamte Cache wieder hergestellt werden soll. Es wurde nun Schrittweise in die Datenbank geschrieben, 50.000 Datensätze Schrittweise.
 #2.09 (DB Update erforderlich!)
 ~ Fix: path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 #2.08
