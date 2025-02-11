@@ -527,15 +527,6 @@ class CData
 						
 						$IU_DATA_ATT .= ")";
 
-						if( !$this->_isEnoughMemory() ) {
-							$this->SQL->query("REPLACE INTO wp_data_cache (id, type_id, parent_path_hash,path_hash,data) VALUES {$IU_DATA_ATT} 
-									ON CONFLICT(id, type_id, parent_path_hash) DO UPDATE SET
-										data =			CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data		THEN excluded.data ELSE data END,
-										utimestamp =	CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data
-														THEN cast(strftime('%s', 'now') as int) ELSE utimestamp END
-									");
-							unset($IU_DATA_ATT);
-						}
 					}
 				}
 			}
