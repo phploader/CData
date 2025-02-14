@@ -135,6 +135,7 @@ BUG: Order in der zweiten Ebene z.B: $F[AAA][BBB][O][Feld] = 'DESC';  funktionie
 BUG: Prüfen ob folgende Reihenfolge funktioniert. $[A][D][123][B][0][test][C][0][test] = 'test1'; $[A][D][abc][B][0][test][C][0][test] = 'Wert2'; OB Beim Filtern nach A.ID = 'abc', wirlkich nur C.test = Wert2 ausgegeben wird und nicht zusätzlich vom anderen Knotten.
 + Enum: Hinzufügen des Enum Variable, diese den übergebenen Wert abgleicht. Wird ein Wert dieses nicht in Enum hinterlegt ist übergeben, so wird der Wert durch Null ersetzt als ob nichts übergeben wurde.
 + Required: ??? ggf. akzeptans, z.B. null or not null?
++ "IN SELECT", "NOT IN SELECT" : Where Bedinung nach SELECT aus anderen Tabellen. Z.b: ATTRIBUTE.W.0.ID['IN SELECT'].ID.ATTRIBUTE.ATTRIBUTE_GROUP.ATTRIBUTE_SET.W.0.Active = 1 Es sollen Filter je Ebene gesetzt werden können, der aufbau nach SELECT erfolgt Rückwerts
 */
 
 class CData
@@ -144,7 +145,7 @@ class CData
 	private $Param;
 	private $BackupDestinationPath;
 	private $BackupPassword;
-	private $MaxMemoryLimit;
+
 
 
 	/**
