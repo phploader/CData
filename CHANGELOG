@@ -4,14 +4,19 @@
 ! Fix: "Wenn nur ein Knotten abgefragt wird z.B: $F['TAB']", dann wird eine Fatal Error geworfen.
 ! Fix: Wenn Datenbank nicht exsistiert, und dierekt dadrauf zugegrifen werden soll, dann wird diese zwar erstellt, jedoch db.cache wird beim  Ersten aufruff nicht erstellt und wirft Fatal Error
 ~ unter umständen kann die repair() Funktion wegen Memory überlauf abbrechen, wenn der gesamte Cache wieder hergestellt werden soll. Es wurde nun Schrittweise in die Datenbank geschrieben, 50.000 Datensätze Schrittweise.
+! Fix: Wen eine  Ebene gelöscht wird, dann werden die unteren Ebenen nicht mit gelöscht. Diese Verbleiben dann als Leichen in der Datenbank.
++ Löschen von Bäumen oder Attributen kann nun durch die Null Übergabe erfolgen. $D['TEST']['D'][1234]['Title'] = null; nach ID: $D['TEST']['D'][1234] = null;
 #2.09 (DB Update erforderlich!)
-~ Fix: path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
+~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
+! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
++ Funktion zum Setzen von Pattern set_Pattern() hinzugefügt. Dadurch ist es möglich naträglich Pattern zu setzen oder zu ändern
+~ getPattern in getPattern umbennant getPattern(ist veraltet)
 #2.08
-+ Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Lavel Cache 2 wird zugleich geleert.
++ Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Level Cache 2 wird zugleich geleert.
 #2.07
 + backup Funktion hinzugefügt, zur erstellung von backups der Datenbanken. $CData->backup();
-~ Fix: Falsche berechnung von Count Ausgebe behoben.
-~ Fix: Falsche berechnung von Count bei einschrenkungen von Objekten.
+! Fix: Falsche berechnung von Count Ausgebe behoben.
+! Fix: Falsche berechnung von Count bei einschrenkungen von Objekten.
 #2.06
 + LGPL Lizensiert.
 - Überflüssige Tabelle wp_data_att_slot entfernt.

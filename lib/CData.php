@@ -30,9 +30,14 @@ namespace wp;
 	];
 	$d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2'] = [
 		'Active'	=> 0,
-		'Title' => 'StorageB',
+		'Title' => '', #Es wird auch ein Attribute Title angelegt, auch wenn ''-leer übergeben wird. Löschen kann es mit einer null Übergabe!
 	];
 	$CData->set_object($d);
+
+*Delete Beispiel:
+	$d['WAREHOUSE']['D']['W1'] = null; #Löscht den gesamten Baum ab $d['WAREHOUSE']['D']['W1']
+	$d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2'] = null; #Löscht den gesamten Baum ab $d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2']
+	$d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2']['Active'] = null; #Löscht das Attribut Active
 
 *#GET Beispiel:
 	$dd['WAREHOUSE'] = []; // gib nur WAREHOUSE konnen aus
@@ -62,13 +67,15 @@ namespace wp;
 ! Fix: "Wenn nur ein Knotten abgefragt wird z.B: $F['TAB']", dann wird eine Fatal Error geworfen.
 ! Fix: Wenn Datenbank nicht exsistiert, und dierekt dadrauf zugegrifen werden soll, dann wird diese zwar erstellt, jedoch db.cache wird beim  Ersten aufruff nicht erstellt und wirft Fatal Error
 ~ unter umständen kann die repair() Funktion wegen Memory überlauf abbrechen, wenn der gesamte Cache wieder hergestellt werden soll. Es wurde nun Schrittweise in die Datenbank geschrieben, 50.000 Datensätze Schrittweise.
+! Fix: Wen eine  Ebene gelöscht wird, dann werden die unteren Ebenen nicht mit gelöscht. Diese Verbleiben dann als Leichen in der Datenbank.
++ Löschen von Bäumen oder Attributen kann nun durch die Null Übergabe erfolgen. $D['TEST']['D'][1234]['Title'] = null; nach ID: $D['TEST']['D'][1234] = null;
 #2.09 (DB Update erforderlich!)
 ~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 ! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
 + Funktion zum Setzen von Pattern set_Pattern() hinzugefügt. Dadurch ist es möglich naträglich Pattern zu setzen oder zu ändern
 ~ getPattern in getPattern umbennant getPattern(ist veraltet)
 #2.08
-+ Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Lavel Cache 2 wird zugleich geleert.
++ Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Level Cache 2 wird zugleich geleert.
 #2.07
 + backup Funktion hinzugefügt, zur erstellung von backups der Datenbanken. $CData->backup();
 ! Fix: Falsche berechnung von Count Ausgebe behoben.
@@ -132,8 +139,11 @@ namespace wp;
 
 @todo
 BUG: Order in der zweiten Ebene z.B: $F[AAA][BBB][O][Feld] = 'DESC';  funktioniert nicht!! Außerdem soll ein [index] hinzugefügt werden.$F[AAA][BBB][O][>>>0<<<][Feld]
-BUG: Prüfen ob folgende Reihenfolge funktioniert. $[A][D][123][B][0][test][C][0][test] = 'test1'; $[A][D][abc][B][0][test][C][0][test] = 'Wert2'; OB Beim Filtern nach A.ID = 'abc', wirlkich nur C.test = Wert2 ausgegeben wird und nicht zusätzlich vom anderen Knotten.
++ Leichen identifizieren und löschen. Alle Elemente die auf ein Vater verweisen dieser bereits gelöscht wurde. Eventuell eine Funktion clear dafür erstellen. Eventull auch get_clear um vorher die Leichen Elemente auszugeben befor diese gelöscht werden, zur sichtung.
++ Azeptieren von Leeren String als Attribut zu speichern. Momentan wird Null und ''-Leer gleich behandelt und Attribut aus der Datenbank entfernt. Stelle Suche: ($ATT !== NULL && $ATT != '')
 + Enum: Hinzufügen des Enum Variable, diese den übergebenen Wert abgleicht. Wird ein Wert dieses nicht in Enum hinterlegt ist übergeben, so wird der Wert durch Null ersetzt als ob nichts übergeben wurde.
++ Allowed: soll beim Pattern kenzeichnen welche Werte erlaubt sind. auch ''-Leerer String soll wenn unerwünscht dadurch verhindert werden.
++ Allowed Expression: regulären Ausdruck diese den Inhalt nach erlaubten Inhalt überprüft.
 + Required: ??? ggf. akzeptans, z.B. null or not null?
 + "IN SELECT", "NOT IN SELECT" : Where Bedinung nach SELECT aus anderen Tabellen. Z.b: ATTRIBUTE.W.0.ID['IN SELECT'].ID.ATTRIBUTE.ATTRIBUTE_GROUP.ATTRIBUTE_SET.W.0.Active = 1 Es sollen Filter je Ebene gesetzt werden können, der aufbau nach SELECT erfolgt Rückwerts
 */
@@ -334,7 +344,7 @@ class CData
 		static $stLevel = 0;
 		
 		static $IU_DATA = '';
-		static $D_DATA = '';
+		static $cD_DATA = [];
 		static $IU_DATA_ATT  = '';
 		static $D_DATA_ATT  = '';
 		static $_RefrechCache = [];
@@ -350,7 +360,7 @@ class CData
 					
 					$_RefrechCache[$Parent_Hash] = true; #aktuallisiere anhand des parent_path_hash Todo: Genauer !
 					
-					if(($Sup['Active']??false) != -2 ) { #Insert/ Update
+					if( !is_null($Sup) && ($Sup['Active']??false) != -2 ) { #Insert/ Update ToDo: depricated: Löschen per Active=-2, muss entfernt werden!
 						$Child_Hash = hash("crc32b", $Parent_Hash.$kType.$kSup);
 
 						$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$Parent_Type}','{$Parent_Id}')";
@@ -371,7 +381,7 @@ class CData
 									$stLevel--;
 								}
 								elseif($this->PATTERN[$kType][$kATT]??false) {
-									if($ATT != '' || ($ATT !== NULL && isset($this->PATTERN[$kType][$kATT]['ForeignKey']) && $this->PATTERN[$kType][$kATT]['ForeignKey'] == 1) ) {
+									if(($ATT !== NULL && $ATT != '') || ($ATT !== NULL && isset($this->PATTERN[$kType][$kATT]['ForeignKey']) && $this->PATTERN[$kType][$kATT]['ForeignKey'] == 1) ) {
 										$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$kATT}'";#Setze Attribute
 										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->_Value2SortHash($ATT)."'" : ",NULL";
 										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->SQL->escapeString($ATT)."'" : ",NULL";
@@ -382,14 +392,10 @@ class CData
 									}
 									
 								}
-							
 						}
-						
-						
 					}
 					else { #Delete
-						$D_DATA .= (($D_DATA) ? ' OR ' : '') . " (id = '{$kSup}' AND type_id = '{$kType}' AND parent_type_id = '{$Parent_Type}' AND parent_data_id = '{$Parent_Id}' AND parent_path_hash = '{$Parent_Hash}')";
-						$D_DATA_ATT .= (($D_DATA_ATT) ? ' OR ' : '') ." (id = '{$kSup}' AND type_id = '{$kType}' AND parent_path_hash = '{$Parent_Hash}' )"; #lösche alle Attribute
+						$cD_DATA[] = [$Parent_Hash, $kType, $kSup];
 					}
 				}
 			}
@@ -422,26 +428,46 @@ class CData
 							");
 			}
 			#2. Lösche in der DB
-			if ($D_DATA??false) {
-				$this->SQL->query("DELETE FROM wp_data WHERE {$D_DATA}");
+			if($cD_DATA??false) {
+				$this->_delete_object($cD_DATA); #Lösche reqursiv
 			}
-			if ($D_DATA_ATT??false) { #Lösche leeres Attribut
+			if($D_DATA_ATT) { #Lösche Attribut wenn es Null gekenzeichnet wurde
 				$this->SQL->query("DELETE FROM wp_data_att WHERE {$D_DATA_ATT}");
 			}
-			#Lösche weitere unter Ebenen. 'ToDo: Je mehr Ebenen, desto heufiger muss diese ausgeführt werden um entgültig zu bereinigen! D.h. es kann erst beim nächsten Delete restlichen Daten von anderen Delete beseitigen.
-			$this->SQL->query("DELETE FROM wp_data AS dt2 WHERE 
-								NOT EXISTS (SELECT 1 FROM wp_data WHERE dt2.parent_data_id = id AND  dt2.parent_type_id  = type_id)
-								AND parent_data_id <> ''"); #Lösche RefIds
-			#Lösche verwaiste Kinder Zweige aus wp_data_att ToDo: Performance Problem
-			$this->SQL->query("DELETE FROM wp_data_att AS dta2 WHERE 
-								NOT EXISTS (SELECT 1 FROM wp_data WHERE dta2.id = id AND dta2.type_id = type_id )
-			");
-			
 			#3. invalidiere Cache
 			$this->_set_cache($_RefrechCache);
 		}
 	}
 	
+	/**
+	 * Löscht reqursiv Baum Objekt
+	 * @param mixed $C[ 0=> [parent_hash, type_id, id ] ]
+	 */
+	private function _delete_object($C, $level=0) {
+		static $D_DATA;
+		$D_DATA[$level] = '';
+		foreach( $C AS $k => $v) {
+			$Child_Hash = hash("crc32b", $v[0].$v[1].$v[2]);
+			$qry = $this->SQL->query("SELECT parent_path_hash, type_id, id FROM wp_data WHERE parent_path_hash = '{$Child_Hash}' AND parent_type_id = '{$v[1]}' AND parent_data_id = '{$v[2]}'");
+			while ($a = $qry->fetchArray(SQLITE3_ASSOC)) {
+				#$parent_Hash = hash("crc32b", $a['parent_path_hash'].$a['type_id'].$a['id']);
+				$c[] = [ $a['parent_path_hash'], $a['type_id'], $a['id'] ];
+			}
+			if($c??false) {
+				$this->_delete_object($c, $level+1);
+				unset($c);
+			}
+			$D_DATA[$level] .= (($D_DATA[$level]) ? ' OR ' : '') . "(parent_path_hash = '{$v[0]}' AND type_id = '{$v[1]}' AND id = '{$v[2]}')";
+		}
+		if($level == 0) {
+			foreach($D_DATA AS $k => $v) { #Aus performance gründen, wird Ebene weise gelöscht
+				$this->SQL->query("DELETE FROM wp_data_att WHERE {$D_DATA[$k]}"); #Lösche Attribute
+				$this->SQL->query("DELETE FROM wp_data_cache WHERE {$D_DATA[$k]}"); #Lösche Cache
+				$this->SQL->query("DELETE FROM wp_data WHERE {$D_DATA[$k]}"); #Lösche Datensatz
+			}
+		}
+	}
+
 	/**
 	 * repariert die wp_data_cache bzw. stellt wieder her.
 	 */
@@ -502,7 +528,7 @@ class CData
 			
 			#1. Lösche alte Datensätze anhand des PathHash
 			$Keys = implode("','",array_keys($RefrechCache_PathHash));
-			$this->SQL->query("DELETE FROM wp_data_cache WHERE parent_path_hash IN ('{$Keys}')");
+			###$this->SQL->query("DELETE FROM wp_data_cache WHERE parent_path_hash IN ('{$Keys}')");#ToDo: weil mit _delete_object auch Cache geleert wird, muss hier nicht mehr wp_data_cache Tabelle vorher geleert werden. Es reicht nur aktuallisieren oder neu hinzufügen. Muss überarbeitet werden
 			
 			#2. Selektiere Datensätze anhand des PathHash
 			$qry = $this->SQL->query("SELECT d.id, d.type_id, d.parent_path_hash, attribute_id, value
@@ -554,19 +580,16 @@ class CData
 	private function _get_where(&$F,&$Pattern,$Level=0) {
 		if($F['W']??false) { #Prüft ob es sich um eine Where anweisung sich handelt
 			$W = ' AND ( ';
+			$WOR = '';
 			foreach ((array) $F['W'] as $kOR => $OR) { #OR Bedinungen durchlaufen
 				$WOR .= ($WOR)? ' OR ( ' : '';
 				$WAND = '';
 				foreach( (array) $OR AS $kAND => $AND ) { #AND Bedinungen durchlaufen
 					if($kAND == 'ID') {
-						#$Value = (is_array($AND)) ? implode("','", $AND) : $AND;
-						#$WAND .= (($WAND)? ' AND ' : ' ')." dtmp{$Level}.id IN ('{$Value}') ";
 						$Value = $this->_get_where_Operations($kAND,$AND,$Level);
 						$WAND .= (($WAND)? ' AND ' : ' ')." {$Value} ";
 					}
 					elseif( in_array($kAND,array_keys((array)$Pattern) ) ) { #Prüfe ob das Attribut auch im Patern enthalten ist. z.B: Active
-						#$Value = (is_array($AND)) ? implode("','", $AND) : $AND;
-						#$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND dt.attribute_id IN ('{$kAND}') AND dt.value IN ('{$Value}') )";
 						$Value = $this->_get_where_Operations($kAND, $AND,$Level);
 						$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp{$Level}.parent_path_hash = dt.parent_path_hash AND dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND dt.attribute_id IN ('{$kAND}') AND ({$Value}) )";
 					}
@@ -754,8 +777,8 @@ class CData
 
 						#ForeignKey Anhang
 						foreach((array)($ForeignKeys??[]) AS $kFK => $FK) {
-							if($savePatern[$kType][$kFK]['ForeignKey']) {
-								$D[ $a['parent_path_hash'] ][ $a['type_id'] ][ $kFK ]['D'][ $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']][ $kFK ] ][ $a['type_id'] ]['D'][$a['id']] 
+							if($savePatern[$kType][$kFK]['ForeignKey'] && isset($D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][ $a['id'] ][ $kFK ]) ) {
+								$D[ $a['parent_path_hash'] ][ $a['type_id'] ][ $kFK ]['D'][ $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][ $a['id'] ][ $kFK ] ][ $a['type_id'] ]['D'][ $a['id'] ] 
 								= &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
 							}
 						}

@@ -37,7 +37,6 @@ $d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2'] = [
 ];
 $CData->set_object($d);
 ```
-- UPDATE, 
 
 
 # GET 
