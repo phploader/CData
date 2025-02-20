@@ -277,10 +277,7 @@ class CData
 	function get_Pattern(&$D) {
 		$D['PATTERN'] = $this->PATTERN;
 	}
-	#[\Deprecated(message: "use get_Pattern() instead", since: "2.9")]
-	function getPattern(&$D) {
-		$this->get_Pattern($D);
-	}
+
 	/**
 	 * Pattern setzen
 	 * @param mixed $D['PATTERN']
