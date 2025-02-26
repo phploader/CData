@@ -441,7 +441,8 @@ class CData
 	 * @param mixed $C[ 0=> [parent_hash, type_id, id ] ]
 	 */
 	private function _delete_object($C, $level=0) {
-		$D_DATA = '';
+		static $D_DATA = [];
+		$D_DATA[$level] = '';
 		foreach( $C AS $k => $v) {
 			$Child_Hash = hash("crc32b", $v[0].$v[1].$v[2]);
 			$qry = $this->SQL->query("SELECT parent_path_hash, type_id, id FROM wp_data WHERE parent_path_hash = '{$Child_Hash}' AND parent_type_id = '{$v[1]}' AND parent_data_id = '{$v[2]}'");
@@ -453,11 +454,13 @@ class CData
 				$this->_delete_object($c, $level+1);
 				unset($c);
 			}
-			$D_DATA .= (($D_DATA) ? ' , ' : '') . "('{$v[0]}' || '{$v[1]}' || '{$v[2]}')";
+			$D_DATA[$level] .= (($D_DATA[$level]) ? ' , ' : '') . "('{$v[0]}' || '{$v[1]}' || '{$v[2]}')";
 		}
-			$this->SQL->query("DELETE FROM wp_data_att WHERE (parent_path_hash || type_id || id) IN ({$D_DATA})"); #Lösche Attribute
-			$this->SQL->query("DELETE FROM wp_data_cache WHERE (parent_path_hash || type_id || id) IN ({$D_DATA})"); #Lösche Cache
-			$this->SQL->query("DELETE FROM wp_data WHERE (parent_path_hash || type_id || id) IN ({$D_DATA})"); #Lösche Datensatz
+		for($i=count($D_DATA)-1;$i >= 0; $i--) { #Löscht von oberen Ebene abwärts die Daten
+			$this->SQL->query("DELETE FROM wp_data_att WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Attribute
+			$this->SQL->query("DELETE FROM wp_data_cache WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Cache
+			$this->SQL->query("DELETE FROM wp_data WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Datensatz
+		}
 	}
 
 	/**
