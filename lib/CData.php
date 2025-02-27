@@ -456,10 +456,12 @@ class CData
 			}
 			$D_DATA[$level] .= (($D_DATA[$level]) ? ' , ' : '') . "('{$v[0]}' || '{$v[1]}' || '{$v[2]}')";
 		}
-		for($i=count($D_DATA)-1;$i >= 0; $i--) { #Löscht von oberen Ebene abwärts die Daten
-			$this->SQL->query("DELETE FROM wp_data_att WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Attribute
-			$this->SQL->query("DELETE FROM wp_data_cache WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Cache
-			$this->SQL->query("DELETE FROM wp_data WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Datensatz
+		if($level == 0) {
+			for($i=count($D_DATA);$i >= 0; $i--) { #Löscht von oberen Ebene abwärts die Daten
+				$this->SQL->query("DELETE FROM wp_data_att WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Attribute
+				$this->SQL->query("DELETE FROM wp_data_cache WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Cache
+				$this->SQL->query("DELETE FROM wp_data WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Datensatz
+			}
 		}
 	}
 
