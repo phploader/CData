@@ -377,7 +377,7 @@ class CData
 									$this->PATTERN = $savePatern; #Setze Pattern auf Ursprung zurück
 									$stLevel--;
 								}
-								elseif($this->PATTERN[$kType][$kATT]??false) {
+								elseif(($this->PATTERN[$kType][$kATT]??false) && !is_array($ATT)) {
 									if(($ATT !== NULL && $ATT != '') || ($ATT !== NULL && isset($this->PATTERN[$kType][$kATT]['ForeignKey']) && $this->PATTERN[$kType][$kATT]['ForeignKey'] == 1) ) {
 										$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$kATT}'";#Setze Attribute
 										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->_Value2SortHash($ATT)."'" : ",NULL";
