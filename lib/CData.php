@@ -68,7 +68,7 @@ namespace wp;
 ! Fix: Wenn Datenbank nicht exsistiert, und dierekt dadrauf zugegrifen werden soll, dann wird diese zwar erstellt, jedoch db.cache wird beim  Ersten aufruff nicht erstellt und wirft Fatal Error
 ~ unter umständen kann die repair() Funktion wegen Memory überlauf abbrechen, wenn der gesamte Cache wieder hergestellt werden soll. Es wurde nun Schrittweise in die Datenbank geschrieben, 50.000 Datensätze Schrittweise.
 ! Fix: Wen eine  Ebene gelöscht wird, dann werden die unteren Ebenen nicht mit gelöscht. Diese Verbleiben dann als Leichen in der Datenbank.
-+ Löschen von Bäumen oder Attributen kann nun durch die Null Übergabe erfolgen. $D['TEST']['D'][1234]['Title'] = null; nach ID: $D['TEST']['D'][1234] = null;
++ Löschen von Bäumen oder Attributen kann nun durch die Null oder durch "__DELETE__" Übergabe erfolgen. $D['TEST']['D'][1234]['Title'] = null; nach ID: $D['TEST']['D'][1234] = null;
 #2.09 (DB Update erforderlich!)
 ~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 ! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
@@ -357,7 +357,7 @@ class CData
 					
 					$_RefrechCache[$Parent_Hash] = true; #aktuallisiere anhand des parent_path_hash Todo: Genauer !
 					
-					if( !is_null($Sup) && ($Sup['Active']??false) != -2 ) { #Insert/ Update ToDo: depricated: Löschen per Active=-2, muss entfernt werden!
+					if( !is_null($Sup) && $Sup != '__DELETE__' && ($Sup['Active']??false) != -2 ) { #Insert/ Update ToDo: depricated: Löschen per Active=-2, muss entfernt werden!
 						$Child_Hash = hash("crc32b", $Parent_Hash.$kType.$kSup);
 
 						$IU_DATA .= (($IU_DATA) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$Parent_Type}','{$Parent_Id}')";
@@ -378,7 +378,7 @@ class CData
 									$stLevel--;
 								}
 								elseif(($this->PATTERN[$kType][$kATT]??false) && !is_array($ATT)) {
-									if(($ATT !== NULL && $ATT != '') || ($ATT !== NULL && isset($this->PATTERN[$kType][$kATT]['ForeignKey']) && $this->PATTERN[$kType][$kATT]['ForeignKey'] == 1) ) {
+									if(($ATT !== NULL && $ATT != '' && $ATT != '__DELETE__') || ($ATT !== NULL && isset($this->PATTERN[$kType][$kATT]['ForeignKey']) && $this->PATTERN[$kType][$kATT]['ForeignKey'] == 1) ) {
 										$IU_DATA_ATT .= (($IU_DATA_ATT) ? ',' : '') . "('{$kSup}','{$kType}','{$Parent_Hash}','{$kATT}'";#Setze Attribute
 										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->_Value2SortHash($ATT)."'" : ",NULL";
 										$IU_DATA_ATT .= (isset($ATT)) ? ",'".$this->SQL->escapeString($ATT)."'" : ",NULL";
