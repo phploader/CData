@@ -199,7 +199,7 @@ class CData
 			$querySingle = $this->SQL->querySingle("SELECT id FROM wp_data_cache LIMIT 1" );
 			if(!$querySingle) { 
 				$querySingle = $this->SQL->querySingle("SELECT id FROM wp_data LIMIT 1" );
-				if($querySingle) {
+				if( isset($querySingle) ) {
 					$this->CCache->flush(['Tag' => '%']);#Lösche den L2-Cache
 					$this->repair(); #Erstelle L1-Cache
 				}
