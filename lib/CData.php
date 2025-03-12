@@ -58,6 +58,7 @@ $dd['STORAGE']['W'][0]['Title']['>'] = 'R002'; // Gib alle ab R002 aus. Möglich
 	#Sortieren:
 	$dd['WHAREGOUSE]['O'][0]['Stock'] = 'DESC';
 	Sortieren Speziall Befehle: ID, UTIMESTAMP, ITIMESTAMP
+	ODER $dd['WHAREGOUSE]['O'][0][ATTRIBUTE][D][-key-]['Title'] = 'DESC';
 
 ===============================
 ##Changelog:
@@ -693,7 +694,7 @@ class CData
 
 private function _get_order(&$F, &$Pattern, $Level=0) {
 	$O = '';
-	if($F['O']??false) {
+	if(($F['O']??false)) {
 					foreach ((array) $F['O'] as $kR => $R) {
 						foreach ((array) $R as $key => $value) {
 							if ($key == 'ID') {
@@ -709,17 +710,32 @@ private function _get_order(&$F, &$Pattern, $Level=0) {
 								$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att dt WHERE dtmp{$Level}.parent_path_hash = dt.parent_path_hash AND dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND attribute_id = '{$key}' ) {$value}";
 							}
 							elseif( in_array($key,array_keys((array)$Pattern['D']) )) {# Weitere Ebene Prüfen
+								
 								#$O .= (($O)? ' AND ' : ' ')." (SELECT 2 FROM wp_data_cache dtmp".($Level+1) ." WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash ";
-								$O .= (($O)? ' AND ' : ' ')." (SELECT sort FROM wp_data_att dt".($Level+1).", wp_data_cache dtmp".($Level+1)." WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash AND 
-								dtmp".($Level+1).".parent_path_hash = dt".($Level+1).".parent_path_hash AND dtmp".($Level+1).".id = dt".($Level+1).".id AND dtmp".($Level+1).".type_id = dt".($Level+1).".type_id  ";
+								$O .= (($O)? ',' : ' ')." (SELECT sort FROM wp_data_att dt".($Level+1).", wp_data_cache dtmp".($Level+1)." 
+								WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash 
+								AND dtmp".($Level+1).".parent_path_hash = dt".($Level+1).".parent_path_hash 
+								AND dtmp".($Level+1).".id = dt".($Level+1).".id 
+								AND dtmp".($Level+1).".type_id = dt".($Level+1).".type_id ";
+								
 								$O .= $this->_get_order($value,$Pattern['D'][$key],$Level+1);
-								$O .= ' ) ';
-							
+								#ToDo: funktioniert nur mit der nächsten ebene. Weil "O" oben gefiltert wird: z.B: $f['ARTICLE']['O'][0]['ATTRIBUTE']['ITEM']['PROPERTY']['D']['Number']['Value'] = 'DESC';
+								if($value['D']??false) {
+									$_id = array_key_first($value['D']);
+									$_att_id = array_key_first($value['D'][$_id]);
+									$O .= " AND dt".($Level+1).".attribute_id = '{$_att_id}' AND dt".($Level+1).".id = '{$_id}' ";
+									$O .= " ) {$value['D'][$_id][$_att_id]}";
+								}
+								else {
+									$O .= ' )';
+								}
 							}
 						}
 					}
+	
 					$O = ($O) ? "ORDER BY {$O}" : '';
 	}
+
 	return $O??'';
 }
 
