@@ -44,7 +44,7 @@ namespace wp;
 	$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK'] = []; // Gib bis Ebene 3 die drei Knoten aus.
 	$dd['WAREHOUSE']['W'][0]['ID'] = 'W1'; // Filtere Nach WAREHUSE ID W1
 	$dd['WAREHOUSE']['STORAGE']['W'][0]['Active'] = [1]; // Gib nur Active STORAGE aller Warehouse aus
-	$dd['STORAGE']['W'][0]['Title']['>'] = 'R002'; // Gib alle ab R002 aus. Möglich: [NOTIN|LIKE-%|LIKE%-|LIKE%%|>|>=|<=|<]
+$dd['STORAGE']['W'][0]['Title']['>'] = 'R002'; // Gib alle ab R002 aus. Möglich: [NOTIN|LIKE-%|LIKE%-|LIKE%%|>|>=|<=|<|<>|!=|=]
 	$dd['STORAGE']['W'][0]['Title'] = ['R001','R002']; // Gib mit Tittle R001,T002 Datensätze aus
 	$dd['STORAGE']['L']['START'] = 1; // Begine ab 1. Gilt für Storage, kann auch für unteren Knoten angegeben werden
 	$dd['STORAGE']['L']['STEP'] = 2; // maximal 2 Datensätze ausgeben. Gilt für Storage, kann auch für unteren Knoten angegeben werden
@@ -69,6 +69,7 @@ namespace wp;
 ~ unter umständen kann die repair() Funktion wegen Memory überlauf abbrechen, wenn der gesamte Cache wieder hergestellt werden soll. Es wurde nun Schrittweise in die Datenbank geschrieben, 50.000 Datensätze Schrittweise.
 ! Fix: Wen eine  Ebene gelöscht wird, dann werden die unteren Ebenen nicht mit gelöscht. Diese Verbleiben dann als Leichen in der Datenbank.
 + Löschen von Bäumen oder Attributen kann nun durch die Null oder durch "__DELETE__" Übergabe erfolgen. $D['TEST']['D'][1234]['Title'] = null; nach ID: $D['TEST']['D'][1234] = null;
+~ ORDER BY Funktion in _get_order ausgelagert für reqursiven Aufruf
 #2.09 (DB Update erforderlich!)
 ~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 ! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
@@ -690,6 +691,39 @@ class CData
 	return " {$O} ";
 }
 
+private function _get_order(&$F, &$Pattern, $Level=0) {
+	$O = '';
+	if($F['O']??false) {
+					foreach ((array) $F['O'] as $kR => $R) {
+						foreach ((array) $R as $key => $value) {
+							if ($key == 'ID') {
+								$O .= (($O) ? ',' : '') . " dtmp{$Level}.id {$value} ";
+							}
+							elseif ($key == 'UTIMESTAMP') {
+								$O .= (($O) ? ',' : '') . " (SELECT utimestamp FROM wp_data d WHERE dtmp{$Level}.parent_path_hash = d.parent_path_hash AND dtmp{$Level}.id = d.id AND dtmp{$Level}.type_id = d.type_id ) {$value} ";
+							}
+							elseif ($key == 'ITIMESTAMP') {
+								$O .= (($O) ? ',' : '') . " (SELECT itimestamp FROM wp_data d WHERE dtmp{$Level}.parent_path_hash = d.parent_path_hash AND dtmp{$Level}.id = d.id AND dtmp{$Level}.type_id = d.type_id ) {$value} ";
+							}
+							elseif( in_array($key,array_keys((array)$Pattern) ) ) { #Prüfe ob das Attribut auch im Patern enthalten ist. z.B: Active
+								$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att dt WHERE dtmp{$Level}.parent_path_hash = dt.parent_path_hash AND dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND attribute_id = '{$key}' ) {$value}";
+							}
+							elseif( in_array($key,array_keys((array)$Pattern['D']) )) {# Weitere Ebene Prüfen
+								#$O .= (($O)? ' AND ' : ' ')." (SELECT 2 FROM wp_data_cache dtmp".($Level+1) ." WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash ";
+								#Todo: Sortieren in der weiteren ebee funktioniert nicht!!
+								$O .= (($O)? ' AND ' : ' ')." (SELECT sort FROM wp_data_att dt".($Level+1).", wp_data_cache dtmp".($Level+1)." WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash AND 
+								dtmp".($Level+1).".parent_path_hash = dt".($Level+1).".parent_path_hash AND dtmp".($Level+1).".id = dt".($Level+1).".id AND dtmp".($Level+1).".type_id = dt".($Level+1).".type_id AND dt".($Level+1).".attribute_id = '{$key}' ";
+								$O .= $this->_get_order($value,$Pattern['D'][$key],$Level+1);
+								$O .= ' ) ';
+							
+							}
+						}
+					}
+					$O = ($O) ? "ORDER BY {$O}" : '';
+	}
+	return $O??'';
+}
+
 	function get_object(&$D = null, &$F=null, $Parent_Hash=[], $Parent_Type = '', $Parent_Id = '') {
 		static $stLevel = 0;
 		
@@ -738,27 +772,7 @@ class CData
 					$L = (isset($F[$kType]['L']['START']) && $F[$kType]['L']['STEP']) ? "LIMIT {$F[$kType]['L']['START']},{$F[$kType]['L']['STEP']}" : $L;
 
 					#Order By
-					$O = '';
-					
-					if ($Type['O']??false) {
-						
-						foreach ((array) $F[$kType]['O'] as $kR => $R) {
-							foreach ((array) $R as $key => $value) {
-								if ($key == 'ID') {
-									$O .= (($O) ? ',' : '') . " dtmp0.id {$value} ";
-								}
-								else if ($key == 'UTIMESTAMP') {
-									$O .= (($O) ? ',' : '') . " (SELECT utimestamp FROM wp_data d WHERE dtmp0.parent_path_hash = d.parent_path_hash AND dtmp0.id = d.id AND dtmp0.type_id = d.type_id ) {$value} ";
-								}
-								else if ($key == 'ITIMESTAMP') {
-									$O .= (($O) ? ',' : '') . " (SELECT itimestamp FROM wp_data d WHERE dtmp0.parent_path_hash = d.parent_path_hash AND dtmp0.id = d.id AND dtmp0.type_id = d.type_id ) {$value} ";
-								} else {
-									$O .= (($O) ? ',' : '') . " (SELECT sort FROM wp_data_att dt WHERE dtmp0.parent_path_hash = dt.parent_path_hash AND dtmp0.id = dt.id AND dtmp0.type_id = dt.type_id AND attribute_id = '{$key}' ) {$value}";
-								}
-							}
-						}
-						$O = ($O) ? "ORDER BY {$O}" : '';
-					}
+					$O = $this->_get_order($Type, $savePatern[$kType],0);
 
 					#2. Holle Daten
 					$_Hash = null;
