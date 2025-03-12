@@ -710,9 +710,8 @@ private function _get_order(&$F, &$Pattern, $Level=0) {
 							}
 							elseif( in_array($key,array_keys((array)$Pattern['D']) )) {# Weitere Ebene Prüfen
 								#$O .= (($O)? ' AND ' : ' ')." (SELECT 2 FROM wp_data_cache dtmp".($Level+1) ." WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash ";
-								#Todo: Sortieren in der weiteren ebee funktioniert nicht!!
 								$O .= (($O)? ' AND ' : ' ')." (SELECT sort FROM wp_data_att dt".($Level+1).", wp_data_cache dtmp".($Level+1)." WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash AND 
-								dtmp".($Level+1).".parent_path_hash = dt".($Level+1).".parent_path_hash AND dtmp".($Level+1).".id = dt".($Level+1).".id AND dtmp".($Level+1).".type_id = dt".($Level+1).".type_id AND dt".($Level+1).".attribute_id = '{$key}' ";
+								dtmp".($Level+1).".parent_path_hash = dt".($Level+1).".parent_path_hash AND dtmp".($Level+1).".id = dt".($Level+1).".id AND dtmp".($Level+1).".type_id = dt".($Level+1).".type_id  ";
 								$O .= $this->_get_order($value,$Pattern['D'][$key],$Level+1);
 								$O .= ' ) ';
 							
