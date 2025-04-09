@@ -5,7 +5,8 @@
 ! Fix: Wenn Datenbank nicht exsistiert, und dierekt dadrauf zugegrifen werden soll, dann wird diese zwar erstellt, jedoch db.cache wird beim  Ersten aufruff nicht erstellt und wirft Fatal Error
 ~ unter umständen kann die repair() Funktion wegen Memory überlauf abbrechen, wenn der gesamte Cache wieder hergestellt werden soll. Es wurde nun Schrittweise in die Datenbank geschrieben, 50.000 Datensätze Schrittweise.
 ! Fix: Wen eine  Ebene gelöscht wird, dann werden die unteren Ebenen nicht mit gelöscht. Diese Verbleiben dann als Leichen in der Datenbank.
-+ Löschen von Bäumen oder Attributen kann nun durch die Null Übergabe erfolgen. $D['TEST']['D'][1234]['Title'] = null; nach ID: $D['TEST']['D'][1234] = null;
++ Löschen von Bäumen oder Attributen kann nun durch die Null oder durch "__DELETE__" Übergabe erfolgen. $D['TEST']['D'][1234]['Title'] = null; nach ID: $D['TEST']['D'][1234] = null;
+~ ORDER BY Funktion in _get_order ausgelagert für reqursiven Aufruf
 #2.09 (DB Update erforderlich!)
 ~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
 ! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
