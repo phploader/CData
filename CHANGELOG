@@ -1,3 +1,7 @@
+#2.11 (DB Update erforderlich!)
+~ Optimierung der PRAGMA Parameter auf Performance.
+~ Duplikat Index wp_data_id_type_id_to_type_id entfernt.
+! Wenn keine Daten in einem Zweig vorhanden sind, wird in cache ein string statt array definiert, so dass nach auslesen der Daten mit der leeren Ausgabe nicht merh als array weiter geführt wird. => Fatal error: Uncaught TypeError: Cannot access offset of type string on string
 #2.10 (DB Update erforderlich!)
 ! Fix: "parent_path_hash" und "path_hash" von integer zur text geändert. Weil sonnst werden Werte wie 4e292770 falsch iterpretiert, bzw. als Int => "INF" statt string.
 + Wenn Pfad zur erstellenden DB nicht vorhanden ist, wird die Ordnerstruktur, automatisch erstellt.
@@ -74,6 +78,11 @@
 ~ Überarbeitet
 ! Fehler
 
+#Update DB 2.10 => 2.11
+DROP INDEX "wp_data_id_type_id_to_type_id";
+DROP INDEX "wp_data_id_parent_path_hash";
+CREATE INDEX "wp_data_id_parent_path_hash" ON "wp_data" ("id","parent_path_hash");
+CREATE INDEX IF NOT EXISTS "wp_data_parent_path_hash" ON "wp_data" ( "parent_path_hash");
 
 #Update DB 2.09 => 2.10
 Bei den folgenden Spalten muss integer zur text geändert werden!

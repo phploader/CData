@@ -64,6 +64,9 @@ $f['STORAGE']['W'][0]['Title'] = ['R001','R002']; // Gib mit Tittle R001,T002 Da
 $f['WAREHOUSE']['STORAGE']['ARTICLE_STOCK']['A']['Stock'] = ['SUM','COUNT','AVG','MIN','MAX']; #Aggregate COUNT,SUM,AVG,MIN,MAX Ermittelt für das Feld Stock. Ist nur für nummerische Werte möglich
 $f['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ID'] = ['A1']; #Kann Filter einer höeren Ebene auf die untere Ebene Anwenden. Z.B: wenn ein Supplier gesucht ist, dieser nur Artiekl von ID A1 beinhalte.
 $f['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['ID'] = ['ATT1','ATT2']; #Gib alle Supplier diese Artikel mit Attribut-ID ATT1 oder ATT2 beinhalten.
+
+$f['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['ID'] = 'Title'; #Berücksichtige nur Attribute mit der ID "Title"
+$f['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['LANGUAGE']['W'][0]['Value']['LIKE%%'] = 'L'; #Gil alle "Artikel" aud diese ein Attribute Title haben und den Buchstaben "L" in irgend einer Sprache.
 $CData->get_object($d,$f);
 ```
 - OR: [W][0] | [W][1] | ...  Anweisungen

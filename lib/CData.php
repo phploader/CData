@@ -62,6 +62,10 @@ $dd['STORAGE']['W'][0]['Title']['>'] = 'R002'; // Gib alle ab R002 aus. Möglich
 
 ===============================
 ##Changelog:
+#2.11 (DB Update erforderlich!)
+~ Optimierung der PRAGMA Parameter auf Performance.
+~ Duplikat Index wp_data_id_type_id_to_type_id entfernt.
+! Wenn keine Daten in einem Zweig vorhanden sind, wird in cache ein string statt array definiert, so dass nach auslesen der Daten mit der leeren Ausgabe nicht merh als array weiter geführt wird. => Fatal error: Uncaught TypeError: Cannot access offset of type string on string
 #2.10 (DB Update erforderlich!)
 ! Fix: "parent_path_hash" und "path_hash" von integer zur text geändert. Weil sonnst werden Werte wie 4e292770 falsch iterpretiert, bzw. als Int => "INF" statt string.
 + Wenn Pfad zur erstellenden DB nicht vorhanden ist, wird die Ordnerstruktur, automatisch erstellt.
@@ -183,8 +187,8 @@ class CData
 				$this->SQL->exec($P['PRAGMA']);
 			} else {
 				$this->SQL->exec("
-				PRAGMA busy_timeout = 5000;		PRAGMA cache_size = -2000;
-				PRAGMA synchronous = 1;			PRAGMA foreign_keys = ON;
+				PRAGMA busy_timeout = 5000;		PRAGMA cache_size = -8192;
+				PRAGMA synchronous = 1;			PRAGMA foreign_keys = OFF;
 				PRAGMA temp_store = MEMORY;		PRAGMA default_temp_store = MEMORY;
 				PRAGMA read_uncommitted = true;	PRAGMA journal_mode = wal;
 				PRAGMA wal_autocheckpoint=1000; PRAGMA encoding = 'UTF-8';
@@ -198,9 +202,9 @@ class CData
 			$this->refreshCacheObjeckt = [];
 
 			#Prüfe ob wp_data_cache Tabelle leer ist, fals ja, dann befülle wenn wp_data Tabelle nicht leer ist
-			$querySingle = $this->SQL->querySingle("SELECT id FROM wp_data_cache LIMIT 1" );
-			if(!$querySingle) { 
-				$querySingle = $this->SQL->querySingle("SELECT id FROM wp_data LIMIT 1" );
+			$querySingle = $this->SQL->querySingle("SELECT 1 FROM wp_data_cache LIMIT 1" );
+			if(!isset($querySingle)) {
+				$querySingle = $this->SQL->querySingle("SELECT 1 FROM wp_data LIMIT 1" );
 				if( isset($querySingle) ) {
 					$this->CCache->flush(['Tag' => '%']);#Lösche den L2-Cache
 					$this->repair(); #Erstelle L1-Cache
@@ -227,10 +231,10 @@ class CData
 			CREATE INDEX IF NOT EXISTS "wp_data_id" ON "wp_data" ("id");
 			CREATE INDEX IF NOT EXISTS "wp_data_type_id" ON "wp_data" ("type_id");
 			CREATE INDEX IF NOT EXISTS "wp_data_utimestamp" ON "wp_data" ("utimestamp");
-			CREATE INDEX IF NOT EXISTS "wp_data_to_type_id" ON "wp_data" ("parent_type_id");
+			CREATE INDEX IF NOT EXISTS "wp_data_parent_type_id" ON "wp_data" ("parent_type_id");
 			CREATE INDEX IF NOT EXISTS "wp_data_id_type_id" ON "wp_data" ("id", "type_id");
-			CREATE INDEX IF NOT EXISTS "wp_data_id_type_id_to_type_id" ON "wp_data" ("id", "type_id");
-			CREATE INDEX IF NOT EXISTS "wp_data_id_parent_path_hash" ON "wp_data" ("parent_path_hash");
+			CREATE INDEX IF NOT EXISTS "wp_data_id_parent_path_hash" ON "wp_data" ("id", "parent_path_hash");
+			CREATE INDEX IF NOT EXISTS "wp_data_parent_path_hash" ON "wp_data" ( "parent_path_hash");
 
 			CREATE TABLE IF NOT EXISTS "wp_data_att" (
 			"id" text COLLATE \'BINARY\' NOT NULL,
@@ -834,7 +838,7 @@ private function _get_order(&$F, &$Pattern, $Level=0) {
 						$_cache[ $_sqlmd5 ] = [
 							'Source'	=> serialize([$kType => $F[$kType] ]),
 							'Tag'		=> $kType.'/'.implode('/',array_keys((array) $F[$kType])),
-							'Data'		=> serialize([$kType => $D[''][$kType]??''] ), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
+							'Data'		=> serialize([$kType => $D[''][$kType]?? [] ] ), #ToDo: Hier wird nicht nur die aktuelle ausgabe gespeichert, sondern die beigefügten Daten per $D zur Funktion
 						];
 						$this->CCache->set_cache($_cache);
 					}
@@ -876,11 +880,12 @@ class CCache
 				$this->SQL->exec($P['PRAGMA']);
 			} else {
 				$this->SQL->exec("
-				PRAGMA busy_timeout = 5000;		PRAGMA cache_size = -2000;
-				PRAGMA synchronous = OFF;		PRAGMA foreign_keys = ON;
+				PRAGMA busy_timeout = 5000;		PRAGMA cache_size = -8192;
+				PRAGMA synchronous = OFF;		PRAGMA foreign_keys = OFF;
 				PRAGMA temp_store = MEMORY;		PRAGMA default_temp_store = MEMORY;
 				PRAGMA read_uncommitted = true;	PRAGMA journal_mode = wal;
-				");
+				
+				");#PRAGMA mmap_size = 52428800;
 			}
 			$this->Param['DB'] = $P['DB'];
 		} else { exit('kein DB-Übergabe Parameter!'); }
@@ -898,7 +903,6 @@ class CCache
 			PRIMARY KEY ("id")
 			);
 			
-			CREATE INDEX IF NOT EXISTS "wp_cache_id" ON "wp_cache" ("id");
 			CREATE INDEX IF NOT EXISTS "wp_cache_tag" ON "wp_cache" ("tag");
 			CREATE INDEX IF NOT EXISTS "wp_cache_ttl" ON "wp_cache" ("ttl");
 			CREATE INDEX IF NOT EXISTS "wp_cache_itimestamp" ON "wp_cache" ("itimestamp");
