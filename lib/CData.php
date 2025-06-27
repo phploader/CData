@@ -3,7 +3,7 @@
 namespace wp;
 
 /** DOC
-@version 2.10
+@version 2.11
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
  
 *#Pattern Beispiel: 
@@ -199,7 +199,6 @@ class CData
 			$this->BackupPassword = $P['BACKUP']['BackupPassword'];
 			$this->PATTERN = $P['PATTERN'];
 			$this->Param['DB'] = $P['DB'];
-			$this->refreshCacheObjeckt = [];
 
 			#Prüfe ob wp_data_cache Tabelle leer ist, fals ja, dann befülle wenn wp_data Tabelle nicht leer ist
 			$querySingle = $this->SQL->querySingle("SELECT 1 FROM wp_data_cache LIMIT 1" );
@@ -500,7 +499,7 @@ class CData
 						
 						$IU_DATA_ATT .= ")";
 
-						if( $_i > 50000 ) {
+						if( $_i > 10000 ) {
 							$this->SQL->query("REPLACE INTO wp_data_cache (id, type_id, parent_path_hash,path_hash,data) VALUES {$IU_DATA_ATT} 
 									ON CONFLICT(id, type_id, parent_path_hash) DO UPDATE SET
 										data =			CASE WHEN excluded.data IS NOT NULL	AND ifnull(data,'') <> excluded.data		THEN excluded.data ELSE data END,
@@ -693,8 +692,8 @@ class CData
 		$O = ($aloneOV)?$aloneOV.')':'';
 		$O .= "{$OV}";
 	
-	return " {$O} ";
-}
+		return " {$O} ";
+	}
 
 private function _get_order(&$F, &$Pattern, $Level=0) {
 	$O = '';

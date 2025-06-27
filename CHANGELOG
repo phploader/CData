@@ -81,7 +81,7 @@
 #Update DB 2.10 => 2.11
 DROP INDEX "wp_data_id_type_id_to_type_id";
 DROP INDEX "wp_data_id_parent_path_hash";
-CREATE INDEX "wp_data_id_parent_path_hash" ON "wp_data" ("id","parent_path_hash");
+CREATE INDEX IF NOT EXISTS "wp_data_id_parent_path_hash" ON "wp_data" ("id","parent_path_hash");
 CREATE INDEX IF NOT EXISTS "wp_data_parent_path_hash" ON "wp_data" ( "parent_path_hash");
 
 #Update DB 2.09 => 2.10
