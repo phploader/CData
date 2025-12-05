@@ -1,6 +1,6 @@
 <?php
 
-namespace wp;
+namespace papp;
 
 /** DOC
 @version 2.11
