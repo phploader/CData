@@ -196,7 +196,7 @@ class CData
 			}
 			
 			$this->BackupDestinationPath = ($P['BACKUP']['DestinationPath'])??'backup/';
-			$this->BackupPassword = $P['BACKUP']['BackupPassword'];
+			$this->BackupPassword = $P['BACKUP']['BackupPassword']??null;
 			$this->PATTERN = $P['PATTERN'];
 			$this->Param['DB'] = $P['DB'];
 
