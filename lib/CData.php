@@ -176,7 +176,9 @@ class CData
 				$this->SQL = new \SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
 			} else {
 				$path= pathinfo($P['DB']['FILENAME']);
-				mkdir($path['dirname'], 0777, true);
+				if(!is_dir($path['dirname'])) {
+					mkdir($path['dirname'], 0777, true);
+				}
 				$this->SQL = new \SQLite3($P['DB']['FILENAME']);
 				$this->CreateDB();
 			}
@@ -848,7 +850,7 @@ private function _get_order(&$F, &$Pattern, $Level=0) {
 
 		
 		if($stLevel == 0) {
-			$D = array_replace_recursive((array)$saveD,(array)$D['']);
+			$D = array_replace_recursive((array)$saveD,(array)($D[''] ?? []) );
 		}
 
 	}

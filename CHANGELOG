@@ -1,7 +1,9 @@
 #2.12 
 ~ Änderung des Namespaces auf papp
 ~ Anpassung der composer.json und Entfernung überflüssiger require‑Einträge
-! Fix: Wenn BackupPassword nicht gesetzt ist, wirft ein Warning aus. 
+! Fix: Warning: Wenn BackupPassword nicht gesetzt ist, wirft ein Warning aus.
+! Fix: Warning: Automatische erstellung des Datenbank-Ordners.
+! Fix: Warning: Trying to access array offset on value of type null
 #2.11 (DB Update erforderlich!)
 ~ Optimierung der PRAGMA Parameter auf Performance.
 ~ Duplikat Index wp_data_id_type_id_to_type_id entfernt.
