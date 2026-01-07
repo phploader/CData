@@ -1,3 +1,6 @@
+#2.13
++ add function registerPattern und unregisterPattern
+! Fix: Warnung: wenn $D_DATA[$i] null ist, wird Warning ausgegeben.
 #2.12 
 ~ Änderung des Namespaces auf papp
 ~ Anpassung der composer.json und Entfernung überflüssiger require‑Einträge

@@ -3,7 +3,7 @@
 namespace papp;
 
 /** DOC
-@version 2.11
+@version 2.13
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
  
 *#Pattern Beispiel: 
@@ -60,87 +60,6 @@ $dd['STORAGE']['W'][0]['Title']['>'] = 'R002'; // Gib alle ab R002 aus. Möglich
 	Sortieren Speziall Befehle: ID, UTIMESTAMP, ITIMESTAMP
 	ODER $dd['WHAREGOUSE]['O'][0][ATTRIBUTE][D][-key-]['Title'] = 'DESC';
 
-===============================
-##Changelog:
-#2.11 (DB Update erforderlich!)
-~ Optimierung der PRAGMA Parameter auf Performance.
-~ Duplikat Index wp_data_id_type_id_to_type_id entfernt.
-! Wenn keine Daten in einem Zweig vorhanden sind, wird in cache ein string statt array definiert, so dass nach auslesen der Daten mit der leeren Ausgabe nicht merh als array weiter geführt wird. => Fatal error: Uncaught TypeError: Cannot access offset of type string on string
-#2.10 (DB Update erforderlich!)
-! Fix: "parent_path_hash" und "path_hash" von integer zur text geändert. Weil sonnst werden Werte wie 4e292770 falsch iterpretiert, bzw. als Int => "INF" statt string.
-+ Wenn Pfad zur erstellenden DB nicht vorhanden ist, wird die Ordnerstruktur, automatisch erstellt.
-! Fix: "Wenn nur ein Knotten abgefragt wird z.B: $F['TAB']", dann wird eine Fatal Error geworfen.
-! Fix: Wenn Datenbank nicht exsistiert, und dierekt dadrauf zugegrifen werden soll, dann wird diese zwar erstellt, jedoch db.cache wird beim  Ersten aufruff nicht erstellt und wirft Fatal Error
-~ unter umständen kann die repair() Funktion wegen Memory überlauf abbrechen, wenn der gesamte Cache wieder hergestellt werden soll. Es wurde nun Schrittweise in die Datenbank geschrieben, 50.000 Datensätze Schrittweise.
-! Fix: Wen eine  Ebene gelöscht wird, dann werden die unteren Ebenen nicht mit gelöscht. Diese Verbleiben dann als Leichen in der Datenbank.
-+ Löschen von Bäumen oder Attributen kann nun durch die Null oder durch "__DELETE__" Übergabe erfolgen. $D['TEST']['D'][1234]['Title'] = null; nach ID: $D['TEST']['D'][1234] = null;
-~ ORDER BY Funktion in _get_order ausgelagert für reqursiven Aufruf
-#2.09 (DB Update erforderlich!)
-~ path_hash in Tabelle wp_data und wp_data_att in parent_path_hash umbennant.
-! Fix: Spechern von Unterschiedlichen Zweigen wurde Daten teilweise vom anderen Zweig übernommen oder gelöscht.
-+ Funktion zum Setzen von Pattern set_Pattern() hinzugefügt. Dadurch ist es möglich naträglich Pattern zu setzen oder zu ändern
-~ getPattern in getPattern umbennant getPattern(ist veraltet)
-#2.08
-+ Automatische erkennung von leerem wp_data_cache und wiederherstellung dessen. Auch Level Cache 2 wird zugleich geleert.
-#2.07
-+ backup Funktion hinzugefügt, zur erstellung von backups der Datenbanken. $CData->backup();
-! Fix: Falsche berechnung von Count Ausgebe behoben.
-! Fix: Falsche berechnung von Count bei einschrenkungen von Objekten.
-#2.06
-+ LGPL Lizensiert.
-- Überflüssige Tabelle wp_data_att_slot entfernt.
-+ namespace wp; hinzugefügt
-- Überflüssige Tabelle wp_data_child entfernt.
-! Sortieren nach einem Feld ist nicht möglich, behoben.
-#2.05
-+ Sortieren nach UTIMESTAMP und ITIMESTAMP hinzugefügt.
-#2.04
-+ Cache Level2 - Klasse für den Cache erstellt. Dadurch werden alle Abfragen an get_object gechacht und durch set_oject wird dieser bereinigt
-! Fix: Wenn ein Zweig gelöscht wird, wurden die Attribute unter wp_data_att nicht mit gelöscht.
-#2.03
-! Fix: WHERE Abfrage überarbeitet, IDs können nun auch in OR Kombinationen unabhängig verwendet werden
-~ Funktionen get_object_recursive und set_object_recursive in get_object und set_object umbennant.
-+ ForeignKey: Beim Pattern kann = 1 übergeben werden. Dadurch kann man ein Feld als Fremdschlüssel kennzeichnen. Bei der Ausgabe wird PARENT->CHILD ausgabe generiert, so dass auch nach Fremdschlüssel selekitert wird.
-~ Where Bedinungn überarbeitet. Die Where Bedinung kann nun Rekursive genutzt werden z.B: $D['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['Value'] = 'test';
-~ Where Oeration IN,NOTIN, LIKE, LIKE%,LIKE%%,LIKE-%,LIKE%-,>,<,<=,<=,<>,!=,= hinzugefügt.
-#2.02
-! Fix: kleine Fehler behebungen
-! Fix: get_object hat Daten diese bereits an die Funktion übergeben wurden, verschluckt.
-#2.01
-~ Überarbeitung und vereinfachung der get und set Funktionen - Code
-~ Performance Optimierung
-#2.00
-+ Möglichkeit, gleiche Knotennamen in unterschiedlichen Pfaden zu verwenden.
-! Fix: Count Ausgabe beim Parent Array behandelt.
-~ Warnings behandelt.
-! Fix: Berechnung des Counts korrigiert.
-+ Where ID-Abfrage einer höhere Ebene realisiert. Erweiterung dieser Funktion sollte durch ToDo100 erfolgen.
-! Fix: Aggregierungsfunktionen überarbeitet
-~ Performance: get_data und get_data_reqursive Optiomiert und jeweils um eine foreach Schleife reduziert.
-~ In Pattern ist nicht mehr erforderlich Parent Type=id hinzuzufügen, dies wird automatisch berücksichtigt.
-#1.03
-+ Automatische Erstellung der Datenbankstruktur
-! Fix: get_object savePatern Fix
-#1.02
-~ Die Übergabe einer SQL-Instanz wird entfernt. Stattdessen wird die Verbindung zur Datenbank beim Instanziieren der Klasse aufgebaut.
-! Fix: Bei mehreren Vater-IDs wurden keine Ergebnisse ausgegeben.
-#1.01
-! Fix: Vater-ID wurde nicht an Unterknoten weitergegeben.
-! Fix: Grundknoten wurde nicht unter wp_Data_att gespeichert, wenn dieser keine Attribute hatte.
-#1.00
-~ Entfernt Sonderlösung für Sprachunterscheidung. Die Sprachunterscheidung sollte durch die Standardstruktur realisiert werden.
-~ ORDER BY kann nun mehrere Bedingungen annehmen.
-! Fix: Problem beim Speichern von mehreren unterschiedlichen Knoten behoben.
-! Fix: WHERE-Anweisung mit OR-Anweisung behoben.
-+ Datenbankzugriff (SQLite) wurde in die Klasse integriert.
-#1.00
-+ Geburt
-
-#Legende:
-+ Neu
-- Entfernt
-~ Überarbeitet
-! Fehler
 ===============================
 
 @todo
@@ -199,7 +118,7 @@ class CData
 			
 			$this->BackupDestinationPath = ($P['BACKUP']['DestinationPath'])??'backup/';
 			$this->BackupPassword = $P['BACKUP']['BackupPassword']??null;
-			$this->PATTERN = $P['PATTERN'];
+			$this->PATTERN = $P['PATTERN']??null;
 			$this->Param['DB'] = $P['DB'];
 
 			#Prüfe ob wp_data_cache Tabelle leer ist, fals ja, dann befülle wenn wp_data Tabelle nicht leer ist
@@ -214,7 +133,39 @@ class CData
 
 		} else { exit('kein DB-Übergabe Parameter!'); }
 	}
+	
+	/**
+	 * Registriert zusätzliche Pattern-Definitionen.
+	 *
+	 * @param array $patterns
+	 * @return void
+	 */
+	public function registerPattern(array $patterns): void {
+		foreach ($patterns as $key => $definition) {
+			// Falls bereits vorhanden → überschreiben
+			$this->PATTERN[$key] = $definition;
+		}
+	}
 
+	/**
+	 * Entfernt registrierte Pattern-Definitionen.
+	 *
+	 * @param string|array $keys
+	 * @return void
+	 */
+	public function unregisterPattern(string|array $keys): void {
+		if (!is_array($keys)) {
+			$keys = [$keys];
+		}
+
+		foreach ($keys as $key) {
+			if (isset($this->PATTERN[$key])) {
+				unset($this->PATTERN[$key]);
+			}
+		}
+	}
+
+	
 	private function CreateDB() {
 		$this->SQL->exec('
 			CREATE TABLE IF NOT EXISTS "wp_data" (
@@ -465,9 +416,11 @@ class CData
 		}
 		if($level == 0) {
 			for($i=count($D_DATA);$i >= 0; $i--) { #Löscht von oberen Ebene abwärts die Daten
-				$this->SQL->query("DELETE FROM wp_data_att WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Attribute
-				$this->SQL->query("DELETE FROM wp_data_cache WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Cache
-				$this->SQL->query("DELETE FROM wp_data WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Datensatz
+				if(isset($D_DATA[$i])) {
+					$this->SQL->query("DELETE FROM wp_data_att WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Attribute
+					$this->SQL->query("DELETE FROM wp_data_cache WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Cache
+					$this->SQL->query("DELETE FROM wp_data WHERE (parent_path_hash || type_id || id) IN ({$D_DATA[$i]})"); #Lösche Datensatz
+				}
 			}
 		}
 	}
