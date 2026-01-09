@@ -3,7 +3,7 @@
 namespace papp;
 
 /** DOC
-@version 2.13
+@version 2.14
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
  
 *#Pattern Beispiel: 
@@ -761,7 +761,7 @@ private function _get_order(&$F, &$Pattern, $Level=0) {
 
 						#ForeignKey Anhang
 						foreach((array)($ForeignKeys??[]) AS $kFK => $FK) {
-							if($savePatern[$kType][$kFK]['ForeignKey'] && isset($D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][ $a['id'] ][ $kFK ]) ) {
+							if(isset($savePatern[$kType][$kFK]['ForeignKey']) && isset($D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][ $a['id'] ][ $kFK ]) ) {
 								$D[ $a['parent_path_hash'] ][ $a['type_id'] ][ $kFK ]['D'][ $D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][ $a['id'] ][ $kFK ] ][ $a['type_id'] ]['D'][ $a['id'] ] 
 								= &$D[ $a['parent_path_hash'] ][ $a['type_id'] ]['D'][$a['id']];
 							}
