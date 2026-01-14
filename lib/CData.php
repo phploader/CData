@@ -581,10 +581,12 @@ class CData
 				$suf = (in_array($kOpe,['LIKE%','LIKE%%','LIKE-%']))?'%':'';
 				if(is_array($Ope)) { #Wurde Value als Array übergeben?
 					foreach((array)$Ope AS $k => $v) {
+						$v = \SQLite3::escapeString($v);
 						$_Value .= ($_Value?' OR ':'')."{$_Fild} LIKE '{$pre}{$v}{$suf}' ";
 					}
 				}
 				else {
+					$Ope = \SQLite3::escapeString($Ope);
 					$_Value = " {$_Fild} LIKE '{$pre}{$Ope}{$suf}'";
 				}
 				$OV .= " {$_Value} ";
@@ -592,10 +594,12 @@ class CData
 			elseif( in_array($kOpe, ['>','<','>=','<=','<>','!=','=']) ) {
 				if(is_array($Ope)) { #Wurde Value als Array übergeben?
 					foreach((array)$Ope AS $k => $v) {
+						$v = \SQLite3::escapeString($v);
 						$_Value .= ($_Value?' OR ':'')." {$_Fild} {$kOpe} '{$v}' ";
 					}
 				}
 				else {
+					$Ope = \SQLite3::escapeString($Ope);
 					$_Value = "{$_Fild} {$kOpe} '{$Ope}'";
 				}
 				$OV .= " {$_Value} ";
@@ -604,10 +608,12 @@ class CData
 				#Todo: Es werden keine Attribute mit NULL angelegt, daher muss bereits NOT EXISTS geprüft werden
 				if(is_array($Ope)) { #Wurde Value als Array übergeben?
 					foreach((array)$Ope AS $k => $v) {
+						$v = \SQLite3::escapeString($v);
 						$_Value .= ($_Value?' OR ':'')." {$_Fild} {$kOpe} ";
 					}
 				}
 				else {
+					$Ope = \SQLite3::escapeString($Ope);
 					$_Value = "{$_Fild} {$kOpe} ";
 				}
 				$OV .= " {$_Value} ";
@@ -618,10 +624,12 @@ class CData
 			elseif( in_array($kOpe, ['IN']) ) {
 				if(is_array($Ope)) { #Wurde Value als Array übergeben?
 					foreach((array)$Ope AS $k => $v) {
+						$v = \SQLite3::escapeString($v);
 						$_Value .= ($_Value?',':'')."'{$v}'";
 					}
 				}
 				else {
+					$Ope = \SQLite3::escapeString($Ope);
 					$_Value = "'{$Ope}'";
 				}
 				$OV .= " {$_Fild} IN ({$_Value}) ";
@@ -629,10 +637,12 @@ class CData
 			elseif( in_array($kOpe, ['NOTIN', 'NOT IN']) ) {
 				if(is_array($Ope)) { #Wurde Value als Array übergeben?
 					foreach((array)$Ope AS $k => $v) {
+						$v = \SQLite3::escapeString($v);
 						$_Value .= ($_Value?',':'')."'{$v}'";
 					}
 				}
 				else {
+					$Ope = \SQLite3::escapeString($Ope);
 					$_Value = "'{$Ope}'";
 				}
 				$OV .= " {$_Fild} NOT IN ({$_Value}) ";
@@ -642,6 +652,7 @@ class CData
 			}
 		}
 		if(!$Operation) { #Wenn keine Operation und kein Wert übergeben wurde aber nur ein kFild, dann ist der Value als Leer zu betrachten
+			$Ope = \SQLite3::escapeString($Ope);
 			$aloneOV .= ($aloneOV?',':" {$_Fild} IN (")."'{$Ope}'"; #Ohne Operator übergab 
 		}
 		$O = ($aloneOV)?$aloneOV.')':'';

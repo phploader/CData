@@ -1,5 +1,6 @@
 #2.14
 ! Fix: Warning: Undefined array key "ParentId" in ...\lib\CData.php on line 764
+! Fix: Select Maskierung hinzugefügt. \SQLite3::escapeString
 #2.13
 + add function registerPattern und unregisterPattern
 ! Fix: Warnung: wenn $D_DATA[$i] null ist, wird Warning ausgegeben.
