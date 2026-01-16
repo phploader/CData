@@ -141,10 +141,7 @@ class CData
 	 * @return void
 	 */
 	public function registerPattern(array $patterns): void {
-		foreach ($patterns as $key => $definition) {
-			// Falls bereits vorhanden → überschreiben
-			$this->PATTERN[$key] = $definition;
-		}
+		$this->PATTERN = array_replace_recursive((array)$this->PATTERN,(array)$patterns);
 	}
 
 	/**
