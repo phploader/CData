@@ -6,62 +6,6 @@ namespace papp;
 @version 2.14
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
  
-*#Pattern Beispiel: 
-  $D['PATTERN']['PLATFORM']['D']['MANUFACTURER'] = [
-	'Active'		=> ['Type' => 'checkbox'],
-	'ParentId'		=> ['Type' => 'id', 'ForeignKey' => 1], #ForeignKey: Beim Pattern kann = 1 übergeben werden. Dadurch kann man ein Feld als Fremdschlüssel kennzeichnen. Bei der Ausgabe wird PARENT->CHILD ausgabe generiert, so dass auch nach Fremdschlüssel selekitert wird.
-	];
- ## Mögliche Attribute: #ToDo: Attribute umsetzen:
- - Type : id, string, number
- - Min : (optional) bei string, gibt mindest Buchstaben an. bei numbers, bestimmt mindest Wert, bereich z.B: -100 oder -100.0000 dann ergibt ein float mit 4 nachkommastellen. ist Min Angegeben, so wird draus ein Pflichtfeld.
- - Max : (optional) bei string, gibt maximal Buchstaben an. bei numbers, bestimmt maximal Wert, bereich z.B: 1000 oder 100.0000 dann ergibt ein float mit 4 nachkommastellen.
- - Enum : (optional)
-
-
-
-*#SET Beispiel:
-  $d['WAREHOUSE']['D']['W1'] = [
-	'Active'	=> 1, //['Value' => -2 ],
-	'Title'		=> 'Warehouse10', //['Value' => 'Warehouse1'],
-	];
-	$d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S1'] = [
-		'Active'	=> 0,
-		'Title' => 'StorageA', //Wird '' oder NULL übergeben, so wird das Attribut gelöscht. Nur nicht bei Type=ForeignKey Da werden auch leere Felder übergeben und nur bei NULL gelöscht
-	];
-	$d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2'] = [
-		'Active'	=> 0,
-		'Title' => '', #Es wird auch ein Attribute Title angelegt, auch wenn ''-leer übergeben wird. Löschen kann es mit einer null Übergabe!
-	];
-	$CData->set_object($d);
-
-*Delete Beispiel:
-	$d['WAREHOUSE']['D']['W1'] = null; #Löscht den gesamten Baum ab $d['WAREHOUSE']['D']['W1']
-	$d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2'] = null; #Löscht den gesamten Baum ab $d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2']
-	$d['WAREHOUSE']['D']['W1']['STORAGE']['D']['W1S2']['Active'] = null; #Löscht das Attribut Active
-
-*#GET Beispiel:
-	$dd['WAREHOUSE'] = []; // gib nur WAREHOUSE konnen aus
-	$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK'] = []; // Gib bis Ebene 3 die drei Knoten aus.
-	$dd['WAREHOUSE']['W'][0]['ID'] = 'W1'; // Filtere Nach WAREHUSE ID W1
-	$dd['WAREHOUSE']['STORAGE']['W'][0]['Active'] = [1]; // Gib nur Active STORAGE aller Warehouse aus
-$dd['STORAGE']['W'][0]['Title']['>'] = 'R002'; // Gib alle ab R002 aus. Möglich: [NOTIN|LIKE-%|LIKE%-|LIKE%%|>|>=|<=|<|<>|!=|=]
-	$dd['STORAGE']['W'][0]['Title'] = ['R001','R002']; // Gib mit Tittle R001,T002 Datensätze aus
-	$dd['STORAGE']['L']['START'] = 1; // Begine ab 1. Gilt für Storage, kann auch für unteren Knoten angegeben werden
-	$dd['STORAGE']['L']['STEP'] = 2; // maximal 2 Datensätze ausgeben. Gilt für Storage, kann auch für unteren Knoten angegeben werden
-	$dd['WAREHOUSE']['STORAGE']['ARTICLE_STOCK']['A']['Stock'] = ['SUM','COUNT','AVG','MIN','MAX']; #Aggregate COUNT,SUM,AVG,MIN,MAX Ermittelt für das Feld Stock. Ist nur für nummerische Werte möglich
-	$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ID'] = ['A1']; #Kann Filter einer höeren Ebene auf die untere Ebene Anwenden. Z.B: wenn ein Supplier gesucht ist, dieser nur Artiekl von ID A1 beinhalte.
-	$dd['PLATFORM']['SUPPLIER']['W'][0]['ARTICLE']['W'][0]['ATTRIBUTE']['W'][0]['ID'] = ['ATT1','ATT2']; #Gib alle Supplier diese Artikel mit Attribut-ID ATT1 oder ATT2 beinhalten.
-
-	#Nachschlage Tabelle am besten mit Punkt (optional) als Standard nutzen.
-	$dd['ARTICLE']['ARTICLE.ATTRIBUTE']['D'][ARTICLE_ID.ATTRIBUTE_ID]['Title'] = 'Hallo';
-
-	#Sortieren:
-	$dd['WHAREGOUSE]['O'][0]['Stock'] = 'DESC';
-	Sortieren Speziall Befehle: ID, UTIMESTAMP, ITIMESTAMP
-	ODER $dd['WHAREGOUSE]['O'][0][ATTRIBUTE][D][-key-]['Title'] = 'DESC';
-
-===============================
-
 @todo
 BUG: Order in der zweiten Ebene z.B: $F[AAA][BBB][O][Feld] = 'DESC';  funktioniert nicht!! Außerdem soll ein [index] hinzugefügt werden.$F[AAA][BBB][O][>>>0<<<][Feld]
 + Leichen identifizieren und löschen. Alle Elemente die auf ein Vater verweisen dieser bereits gelöscht wurde. Eventuell eine Funktion clear dafür erstellen. Eventull auch get_clear um vorher die Leichen Elemente auszugeben befor diese gelöscht werden, zur sichtung.
@@ -543,15 +487,16 @@ class CData
 						$Value = $this->_get_where_Operations($kAND,$AND,$Level);
 						$WAND .= (($WAND)? ' AND ' : ' ')." {$Value} ";
 					}
-					elseif( in_array($kAND,array_keys((array)$Pattern) ) ) { #Prüfe ob das Attribut auch im Patern enthalten ist. z.B: Active
+					elseif( in_array($kAND,array_keys( (array)($Pattern??[])  ) ) ) { #Prüfe ob das Attribut auch im Patern enthalten ist. z.B: Active
 						$Value = $this->_get_where_Operations($kAND, $AND,$Level);
 						$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 1 FROM wp_data_att dt WHERE dtmp{$Level}.parent_path_hash = dt.parent_path_hash AND dtmp{$Level}.id = dt.id AND dtmp{$Level}.type_id = dt.type_id AND dt.attribute_id IN ('{$kAND}') AND ({$Value}) )";
 					}
-					elseif( in_array($kAND,array_keys((array)$Pattern['D']) )) {# Weitere Ebene Prüfen
+					elseif( in_array($kAND,array_keys((array)($Pattern['D']??[])  ) )) {# Weitere Ebene Prüfen
 						$WAND .= (($WAND)? ' AND ' : ' ')." EXISTS (SELECT 2 FROM wp_data_cache dtmp".($Level+1) ." WHERE dtmp".($Level+1).".parent_path_hash = dtmp{$Level}.path_hash ";
 						$WAND .= $this->_get_where($AND,$Pattern['D'][$kAND],$Level+1);
 						$WAND .= ' ) ';
 					}
+					else { $WAND .= 1;}
 				}
 				$WOR .= ($WOR)?"{$WAND} ) " : $WAND;
 			}

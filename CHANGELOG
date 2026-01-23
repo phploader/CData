@@ -1,4 +1,5 @@
 #2.14
+! Fix: Wird auf ein Unbekantes Pattern mit Where Anweisugn zugegrifen, so erzeugt dies einen Fatal Error
 ! Fix: Warning: Undefined array key "ParentId" in ...\lib\CData.php on line 764
 ! Fix: Select Maskierung hinzugefügt. \SQLite3::escapeString
 ! Fix: bei mehreren übergaben von Pattern an registerPattern Funktion wurden die Bäume überschrieben.
