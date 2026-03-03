@@ -332,6 +332,8 @@ class CData
 			}
 			#3. invalidiere Cache
 			$this->_set_cache($_RefrechCache);
+			# 🔥 HIER: statische Variablen zurücksetzen 
+			$IU_DATA = ''; $cD_DATA = []; $IU_DATA_ATT = ''; $D_DATA_ATT = ''; $_RefrechCache = [];
 		}
 	}
 	
