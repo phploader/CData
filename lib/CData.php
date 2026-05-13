@@ -3,7 +3,7 @@
 namespace papp;
 
 /** DOC
-@version 2.14
+@version 2.15
 @license https://opensource.org/license/lgpl-3-0 GNU Public License
  
 @todo
@@ -29,7 +29,7 @@ class CData
 
 	/**
 	 * 'PATTERN'	=> Pattern
-	 * 'DB'			=> [FILENAME,FLAGS] Datenbank Zugang
+	 * 'DB'			=> [FILENAME,FLAGS,FILENAME_C] Datenbank Zugang
 	 * 'BACKUP'		=> [DestinationPath, BackupPassword] (optional)
 	*/
 	function __construct($P=null)
@@ -46,7 +46,8 @@ class CData
 				$this->CreateDB();
 			}
 
-			$this->CCache = new CCache([ 'DB' => ['FILENAME' => $P['DB']['FILENAME'].'.cache' ] ]);
+			$_File_Cache = $P['DB']['FILENAME_C']??$P['DB']['FILENAME'];
+			$this->CCache = new CCache([ 'DB' => ['FILENAME' => $_File_Cache.'.cache' ] ]);
 
 			if($P['PRAGMA']??false) {
 				$this->SQL->exec($P['PRAGMA']);
@@ -782,6 +783,10 @@ class CCache
 			if(file_exists($P['DB']['FILENAME'])) {
 				$this->SQL = new \SQLite3($P['DB']['FILENAME'], ($P['DB']['FLAGS']??SQLITE3_OPEN_READWRITE) );
 			} else {
+				$path= pathinfo($P['DB']['FILENAME']);
+				if(!is_dir($path['dirname'])) {
+					mkdir($path['dirname'], 0777, true);
+				}
 				$this->SQL = new \SQLite3($P['DB']['FILENAME']);
 				$this->CreateDB();
 			}
