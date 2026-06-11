@@ -1,5 +1,5 @@
 {
-    "name": "papp/cdata",
+    "name": "phploader/cdata",
     "description": "CData präsentiert ein innovatives Datenbankkonzept, das den schnellen Transfer von Daten ermöglicht. Entwickler müssen sich nicht um SQL-Befehle, deren Optimierung oder Sicherheitsaspekte kümmern. CData verfügt über Level-1- und Level-2-Caching, um die Performance weiter zu steigern. Die Datenbankabfragen sind teilweise bis zu zehnmal schneller als herkömmliche MySQL-Abfragen. CFile bietet umfassende Datenfunktionen an.",
     "keywords": [ "cdata", "ccache","sqlite"],
     "license": "LGPL-3.0-or-later",
@@ -15,9 +15,9 @@
         "php": "^8.0"
     },
 	"autoload" : {
-		"psr-4" : { "papp\\" : "lib/" }
+		"psr-4" : { "phploader\\" : "lib/" }
 	},
 	"autoload-dev" : {
-		"psr-4" : { "papp\\" : "lib/" }
+		"psr-4" : { "phploader\\" : "lib/" }
 	}
 }
